@@ -1,9 +1,0 @@
-{
-  "configurations": {
-    "app": {
-      "appLocation": ".",
-      "outputLocation": ".",
-      "appBuildCommand": ""
-    }
-  }
-}
