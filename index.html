@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>5-player round robin — Jan, Daniel, Joonas, Lukas, Henrik</title>
+  <style>
+    :root {
+      --text: #1a1a1a;
+      --text-secondary: #5c5c5c;
+      --text-tertiary: #8a8a8a;
+      --bg: #f7f7f5;
+      --surface: #ffffff;
+      --fill: #ecece8;
+      --fill-strong: #e2e2dc;
+      --stroke: #d4d4ce;
+      --stroke-strong: #b8b8b0;
+      --accent: #3b6fd8;
+      --accent-text: #ffffff;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --text: #ececec;
+        --text-secondary: #b4b4b4;
+        --text-tertiary: #8c8c8c;
+        --bg: #1a1a1a;
+        --surface: #242424;
+        --fill: #2e2e2e;
+        --fill-strong: #3a3a3a;
+        --stroke: #3f3f3f;
+        --stroke-strong: #5a5a5a;
+        --accent: #6b93e8;
+        --accent-text: #111111;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.45;
+    }
+
+    main {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 32px 20px 64px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 650;
+      margin: 0 0 8px;
+      letter-spacing: -0.02em;
+    }
+
+    h2 {
+      font-size: 16px;
+      font-weight: 650;
+      margin: 32px 0 8px;
+    }
+
+    h3 {
+      font-size: 14px;
+      font-weight: 650;
+      margin: 0 0 8px;
+    }
+
+    p { margin: 0 0 12px; }
+    .lede { color: var(--text-secondary); max-width: 62ch; }
+    .hint { color: var(--text-secondary); font-size: 13px; }
+
+    .stats {
+      display: flex;
+      gap: 32px;
+      margin: 20px 0 8px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 650;
+      line-height: 1.1;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--stroke);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      font-size: 14px;
+      border-bottom: 1px solid var(--stroke);
+    }
+
+    th {
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--text-secondary);
+      background: var(--fill);
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tbody tr:nth-child(even) { background: var(--fill); }
+    td.center, th.center { text-align: center; }
+    .matrix td:first-child, .matrix th:first-child { font-weight: 600; }
+
+    .pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0 16px;
+    }
+
+    button.pill {
+      border: 1px solid var(--stroke);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    button.pill[aria-pressed="true"] {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-text);
+    }
+
+    .focus {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+      gap: 24px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .diagram-wrap {
+      text-align: center;
+    }
+
+    .diagram-wrap svg { display: block; margin: 0 auto; }
+
+    .round-meta p { margin: 0 0 6px; }
+
+    .minis {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .mini {
+      border: 1px solid var(--stroke);
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 8px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .mini.active {
+      border-color: var(--accent);
+      background: var(--fill);
+    }
+
+    .mini svg { display: block; margin: 4px auto 0; width: 100%; height: auto; }
+
+    footer {
+      margin-top: 40px;
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    @media (max-width: 720px) {
+      .focus, .minis { grid-template-columns: 1fr; }
+      .stats { gap: 20px; }
+    }
+
+    @media print {
+      body { background: white; color: black; }
+      button.pill { display: none; }
+      .mini { break-inside: avoid; }
+      .minis { grid-template-columns: repeat(5, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>5-player round robin</h1>
+    <p class="lede">
+      Jan, Daniel, Joonas, Lukas, and Henrik each play every other person once.
+      Five rounds, two 1v1s per round, one person sitting out. Joonas sits first;
+      Lukas sits second; Henrik sits in round 4. Every pairing is unique.
+    </p>
+
+    <div class="stats">
+      <div>
+        <div class="stat-value">5</div>
+        <div class="stat-label">Rounds</div>
+      </div>
+      <div>
+        <div class="stat-value">10</div>
+        <div class="stat-label">Unique 1v1s</div>
+      </div>
+      <div>
+        <div class="stat-value">1</div>
+        <div class="stat-label">Bye each round</div>
+      </div>
+    </div>
+
+    <h2>Schedule</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Round</th>
+          <th>Match 1</th>
+          <th>Match 2</th>
+          <th>Sitting out</th>
+        </tr>
+      </thead>
+      <tbody id="schedule-body"></tbody>
+    </table>
+
+    <h2>Round diagrams</h2>
+    <p class="hint">
+      Players sit on a pentagon. Blue lines are the two matches; the dashed node is sitting out.
+      Click a round to focus it.
+    </p>
+    <div class="pills" id="pills"></div>
+    <div class="focus">
+      <div class="diagram-wrap">
+        <div id="focus-svg"></div>
+        <p class="hint" id="focus-caption"></p>
+      </div>
+      <div class="round-meta" id="focus-meta"></div>
+    </div>
+    <div class="minis" id="minis"></div>
+
+    <h2>Who plays whom</h2>
+    <p class="hint">Cell is the round that pair meets. Diagonal is the same person.</p>
+    <table class="matrix">
+      <thead id="matrix-head"></thead>
+      <tbody id="matrix-body"></tbody>
+    </table>
+
+    <footer>Good Luck!</footer>
+  </main>
+
+  <script>
+    const PLAYERS = ["Jan", "Daniel", "Joonas", "Lukas", "Henrik"];
+    const SHORT = { Jan: "Ja", Daniel: "Da", Joonas: "Jo", Lukas: "Lu", Henrik: "He" };
+    const ROUNDS = [
+      { round: 1, bye: "Joonas", matches: [["Jan", "Lukas"], ["Daniel", "Henrik"]] },
+      { round: 2, bye: "Lukas", matches: [["Joonas", "Henrik"], ["Jan", "Daniel"]] },
+      { round: 3, bye: "Daniel", matches: [["Henrik", "Jan"], ["Lukas", "Joonas"]] },
+      { round: 4, bye: "Henrik", matches: [["Lukas", "Daniel"], ["Joonas", "Jan"]] },
+      { round: 5, bye: "Jan", matches: [["Daniel", "Joonas"], ["Henrik", "Lukas"]] },
+    ];
+
+    const pairKey = (a, b) => [a, b].sort().join("|");
+    const PAIR_ROUND = {};
+    for (const r of ROUNDS) {
+      for (const [a, b] of r.matches) PAIR_ROUND[pairKey(a, b)] = r.round;
+    }
+
+    const styles = getComputedStyle(document.documentElement);
+    const colors = {
+      text: styles.getPropertyValue("--text").trim(),
+      textSecondary: styles.getPropertyValue("--text-secondary").trim(),
+      textTertiary: styles.getPropertyValue("--text-tertiary").trim(),
+      fill: styles.getPropertyValue("--fill").trim(),
+      fillStrong: styles.getPropertyValue("--fill-strong").trim(),
+      stroke: styles.getPropertyValue("--stroke-strong").trim(),
+      accent: styles.getPropertyValue("--accent").trim(),
+    };
+
+    function vertex(cx, cy, r, i, n = 5) {
+      const angle = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+      return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+    }
+
+    function diagramSvg(round, size, compact) {
+      const cx = size / 2;
+      const cy = size / 2;
+      const ring = compact ? size * 0.32 : size * 0.34;
+      const nodeR = compact ? 11 : 18;
+      const nodes = PLAYERS.map((name, i) => ({ name, ...vertex(cx, cy, ring, i) }));
+      const byName = Object.fromEntries(nodes.map((n) => [n.name, n]));
+      const ns = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("width", String(size));
+      svg.setAttribute("height", String(size));
+      svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+      svg.setAttribute(
+        "aria-label",
+        `Round ${round.round}: ${round.matches[0][0]} vs ${round.matches[0][1]}, ${round.matches[1][0]} vs ${round.matches[1][1]}, ${round.bye} sits out`
+      );
+
+      const poly = document.createElementNS(ns, "polygon");
+      poly.setAttribute("points", nodes.map((n) => `${n.x},${n.y}`).join(" "));
+      poly.setAttribute("fill", "none");
+      poly.setAttribute("stroke", colors.stroke);
+      poly.setAttribute("stroke-width", "1");
+      svg.appendChild(poly);
+
+      for (const [a, b] of round.matches) {
+        const line = document.createElementNS(ns, "line");
+        line.setAttribute("x1", byName[a].x);
+        line.setAttribute("y1", byName[a].y);
+        line.setAttribute("x2", byName[b].x);
+        line.setAttribute("y2", byName[b].y);
+        line.setAttribute("stroke", colors.accent);
+        line.setAttribute("stroke-width", compact ? "2.5" : "3.5");
+        line.setAttribute("stroke-linecap", "round");
+        svg.appendChild(line);
+      }
+
+      for (const n of nodes) {
+        const isBye = n.name === round.bye;
+        const g = document.createElementNS(ns, "g");
+        const circle = document.createElementNS(ns, "circle");
+        circle.setAttribute("cx", n.x);
+        circle.setAttribute("cy", n.y);
+        circle.setAttribute("r", nodeR);
+        circle.setAttribute("fill", isBye ? colors.fill : colors.fillStrong);
+        circle.setAttribute("stroke", isBye ? colors.stroke : colors.accent);
+        circle.setAttribute("stroke-width", isBye ? "1.5" : compact ? "2" : "2.5");
+        if (isBye) circle.setAttribute("stroke-dasharray", "3 2");
+        g.appendChild(circle);
+
+        const initials = document.createElementNS(ns, "text");
+        initials.setAttribute("x", n.x);
+        initials.setAttribute("y", n.y + 1);
+        initials.setAttribute("text-anchor", "middle");
+        initials.setAttribute("dominant-baseline", "middle");
+        initials.setAttribute("fill", colors.text);
+        initials.setAttribute("font-size", compact ? "9" : "11");
+        initials.setAttribute("font-weight", "600");
+        initials.textContent = compact ? SHORT[n.name] : n.name.slice(0, 2);
+        g.appendChild(initials);
+
+        if (!compact) {
+          const label = document.createElementNS(ns, "text");
+          label.setAttribute("x", n.x);
+          label.setAttribute("y", n.y + nodeR + 14);
+          label.setAttribute("text-anchor", "middle");
+          label.setAttribute("fill", isBye ? colors.textTertiary : colors.textSecondary);
+          label.setAttribute("font-size", "11");
+          label.textContent = isBye ? `${n.name} · bye` : n.name;
+          g.appendChild(label);
+        }
+        svg.appendChild(g);
+      }
+      return svg;
+    }
+
+    let selected = 1;
+
+    function render() {
+      const current = ROUNDS[selected - 1];
+
+      document.querySelectorAll("#pills .pill").forEach((btn) => {
+        btn.setAttribute("aria-pressed", btn.dataset.round === String(selected) ? "true" : "false");
+      });
+
+      const focus = document.getElementById("focus-svg");
+      focus.replaceChildren(diagramSvg(current, 280, false));
+      document.getElementById("focus-caption").textContent =
+        `Circle method · pentagon pairing for round ${current.round}`;
+      document.getElementById("focus-meta").innerHTML =
+        `<h3>Round ${current.round}</h3>` +
+        `<p><strong>Sitting out:</strong> ${current.bye}</p>` +
+        current.matches.map(([a, b]) => `<p><strong>${a}</strong> vs <strong>${b}</strong></p>`).join("");
+
+      document.querySelectorAll(".mini").forEach((el) => {
+        el.classList.toggle("active", el.dataset.round === String(selected));
+      });
+    }
+
+    function init() {
+      const scheduleBody = document.getElementById("schedule-body");
+      for (const r of ROUNDS) {
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          `<td>Round ${r.round}</td>` +
+          `<td>${r.matches[0][0]} vs ${r.matches[0][1]}</td>` +
+          `<td>${r.matches[1][0]} vs ${r.matches[1][1]}</td>` +
+          `<td>${r.bye}</td>`;
+        scheduleBody.appendChild(tr);
+      }
+
+      const pills = document.getElementById("pills");
+      for (const r of ROUNDS) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "pill";
+        btn.dataset.round = String(r.round);
+        btn.textContent = `Round ${r.round}`;
+        btn.addEventListener("click", () => {
+          selected = r.round;
+          render();
+        });
+        pills.appendChild(btn);
+      }
+
+      const minis = document.getElementById("minis");
+      for (const r of ROUNDS) {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "mini";
+        card.dataset.round = String(r.round);
+        card.append(`R${r.round} · ${r.bye} out`);
+        card.appendChild(diagramSvg(r, 128, true));
+        card.addEventListener("click", () => {
+          selected = r.round;
+          render();
+        });
+        minis.appendChild(card);
+      }
+
+      const head = document.getElementById("matrix-head");
+      const headRow = document.createElement("tr");
+      headRow.innerHTML = `<th></th>` + PLAYERS.map((p) => `<th class="center">${p}</th>`).join("");
+      head.appendChild(headRow);
+
+      const body = document.getElementById("matrix-body");
+      for (const row of PLAYERS) {
+        const tr = document.createElement("tr");
+        const cells = PLAYERS.map((col) => {
+          if (row === col) return `<td class="center">—</td>`;
+          return `<td class="center">R${PAIR_ROUND[pairKey(row, col)]}</td>`;
+        }).join("");
+        tr.innerHTML = `<td>${row}</td>` + cells;
+        body.appendChild(tr);
+      }
+
+      render();
+    }
+
+    init();
+  </script>
+</body>
+</html>
