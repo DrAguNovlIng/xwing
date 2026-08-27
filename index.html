@@ -148,6 +148,15 @@
     .standings { margin-top: 8px; }
     .standings td.center, .standings th.center { text-align: center; }
 
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    a:hover { text-decoration: underline; }
+
+    .builds td:last-child { white-space: nowrap; }
+    .faction { color: var(--text-secondary); font-size: 13px; }
+
     .pills {
       display: flex;
       flex-wrap: wrap;
@@ -256,6 +265,20 @@
       </div>
     </div>
 
+    <h2>Squads</h2>
+    <p class="hint">X-Wing lists built in YASB (Yet Another Squad Builder).</p>
+    <table class="builds">
+      <thead>
+        <tr>
+          <th>Player</th>
+          <th>Squad</th>
+          <th>Faction</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="builds-body"></tbody>
+    </table>
+
     <h2>Standings</h2>
     <table class="standings">
       <thead>
@@ -309,6 +332,33 @@
   <script>
     const PLAYERS = ["Jan", "Daniel", "Joonas", "Lukas", "Henrik"];
     const SHORT = { Jan: "Ja", Daniel: "Da", Joonas: "Jo", Lukas: "Lu", Henrik: "He" };
+    const BUILDS = {
+      Henrik: {
+        url: "https://yasb.app/?f=Galactic%20Empire&d=v10ZsZ50Z469XWW186WW102W633WY565X116W381W105Y566X127W105Y217X119W338&sn=Nuke%20Vader&obs=gascloud1,gascloud2,gascloud3",
+        name: "Nuke Vader",
+        faction: "Galactic Empire",
+      },
+      Joonas: {
+        url: "https://yasb.app/?f=Resistance&d=v10ZsZ50Z244X342WWW173W30WW174WWWW193Y239X172W127WWWY254X5WWW175W360Y735X172W626WW186W175W&sn=Tournament%20build&obs=gascloud3,gascloud4,gascloud1",
+        name: "Tournament build",
+        faction: "Resistance",
+      },
+      Jan: {
+        url: "https://yasb.app/?f=Scum%20and%20Villainy&d=v10ZsZ50Z119X121WW93WW105WY103X121WWW453W71WWWW153W89Y719X121W608W445&sn=Hvis%20jeg%20taber%20er%20det%20Lukas%20skyld&obs=coreasteroid5,coreasteroid1,coreasteroid2",
+        name: "Hvis jeg taber er det Lukas skyld",
+        faction: "Scum and Villainy",
+      },
+      Lukas: {
+        url: "https://yasb.app/?f=Separatist%20Alliance&d=v10ZsZ50Z429XWWW218WW92WW370W334Y357XW127W255W633WW625Y272X204WWWWW624W425WW106W216&sn=Bedre%20end%20Jans%20Build&obs=gascloud1,gascloud2,gascloud3",
+        name: "Bedre end Jans Build",
+        faction: "Separatist Alliance",
+      },
+      Daniel: {
+        url: "https://yasb.app/?f=Rebel%20Alliance&d=v10ZsZ50Z1XW4WW142Y1XW4WW142Y1XW4WW142Y33XWW333W453WW639Y31XW51W46WW639&sn=Blue%20Squadron&obs=core2asteroid0,core2asteroid2,coreasteroid0",
+        name: "Blue Squadron",
+        faction: "Rebel Alliance",
+      },
+    };
     const ROUNDS = [
       { round: 1, bye: "Joonas", matches: [["Jan", "Lukas"], ["Daniel", "Henrik"]] },
       { round: 2, bye: "Jan", matches: [["Daniel", "Joonas"], ["Henrik", "Lukas"]] },
@@ -373,6 +423,12 @@
       }
       return PLAYERS.map((p) => ({ player: p, ...record[p] }))
         .sort((a, b) => b.wins - a.wins || a.losses - b.losses || a.player.localeCompare(b.player));
+    }
+
+    function playerLink(name) {
+      const build = BUILDS[name];
+      if (!build) return name;
+      return `<a href="${build.url}" target="_blank" rel="noopener noreferrer">${name}</a>`;
     }
 
     function matrixCell(row, col) {
@@ -518,11 +574,23 @@
     }
 
     function init() {
+      const buildsBody = document.getElementById("builds-body");
+      for (const player of PLAYERS) {
+        const build = BUILDS[player];
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          `<td>${playerLink(player)}</td>` +
+          `<td>${build.name}</td>` +
+          `<td class="faction">${build.faction}</td>` +
+          `<td><a href="${build.url}" target="_blank" rel="noopener noreferrer">Open in YASB</a></td>`;
+        buildsBody.appendChild(tr);
+      }
+
       const standingsBody = document.getElementById("standings-body");
       for (const { player, wins, losses } of computeStandings()) {
         const tr = document.createElement("tr");
         tr.innerHTML =
-          `<td>${player}</td>` +
+          `<td>${playerLink(player)}</td>` +
           `<td class="center">${wins}</td>` +
           `<td class="center">${losses}</td>`;
         standingsBody.appendChild(tr);
@@ -573,7 +641,7 @@
 
       const head = document.getElementById("matrix-head");
       const headRow = document.createElement("tr");
-      headRow.innerHTML = `<th></th>` + PLAYERS.map((p) => `<th class="center">${p}</th>`).join("");
+      headRow.innerHTML = `<th></th>` + PLAYERS.map((p) => `<th class="center">${playerLink(p)}</th>`).join("");
       head.appendChild(headRow);
 
       const body = document.getElementById("matrix-body");
@@ -583,7 +651,7 @@
           if (row === col) return `<td class="center">—</td>`;
           return `<td class="center">${matrixCell(row, col)}</td>`;
         }).join("");
-        tr.innerHTML = `<td>${row}</td>` + cells;
+        tr.innerHTML = `<td>${playerLink(row)}</td>` + cells;
         body.appendChild(tr);
       }
 
