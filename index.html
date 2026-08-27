@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>5-player round robin — Jan, Daniel, Joonas, Lukas, Henrik</title>
+  <link rel="stylesheet" href="https://yasb.app/fonts/xwing-miniatures.css" />
   <style>
     :root {
       --text: #1a1a1a;
@@ -157,6 +158,33 @@
     .builds td:last-child { white-space: nowrap; }
     .faction { color: var(--text-secondary); font-size: 13px; }
 
+    .faction-cell {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    .faction-cell i {
+      font-size: 22px;
+      line-height: 1;
+      color: var(--text);
+    }
+
+    .ship-icons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .ship-icons i {
+      font-size: 28px;
+      line-height: 1;
+      color: var(--text);
+    }
+
     .pills {
       display: flex;
       flex-wrap: wrap;
@@ -272,6 +300,7 @@
         <tr>
           <th>Player</th>
           <th>Squad</th>
+          <th>Ships</th>
           <th>Faction</th>
           <th></th>
         </tr>
@@ -332,31 +361,61 @@
   <script>
     const PLAYERS = ["Jan", "Daniel", "Joonas", "Lukas", "Henrik"];
     const SHORT = { Jan: "Ja", Daniel: "Da", Joonas: "Jo", Lukas: "Lu", Henrik: "He" };
+    const FACTION_ICONS = {
+      "Galactic Empire": "empire",
+      "Rebel Alliance": "rebel",
+      "Scum and Villainy": "scum",
+      "Resistance": "rebel-outline",
+      "Separatist Alliance": "separatists",
+    };
     const BUILDS = {
       Henrik: {
         url: "https://yasb.app/?f=Galactic%20Empire&d=v10ZsZ50Z469XWW186WW102W633WY565X116W381W105Y566X127W105Y217X119W338&sn=Nuke%20Vader&obs=gascloud1,gascloud2,gascloud3",
         name: "Nuke Vader",
         faction: "Galactic Empire",
+        ships: [
+          { slug: "tieddefender", name: "TIE/d Defender", count: 1 },
+          { slug: "tielnfighter", name: "TIE/ln Fighter", count: 3 },
+        ],
       },
       Joonas: {
         url: "https://yasb.app/?f=Resistance&d=v10ZsZ50Z244X342WWW173W30WW174WWWW193Y239X172W127WWWY254X5WWW175W360Y735X172W626WW186W175W&sn=Tournament%20build&obs=gascloud3,gascloud4,gascloud1",
         name: "Tournament build",
         faction: "Resistance",
+        ships: [
+          { slug: "scavengedyt1300", name: "Scavenged YT-1300", count: 1 },
+          { slug: "rz2awing", name: "RZ-2 A-wing", count: 1 },
+          { slug: "t70xwing", name: "T-70 X-wing", count: 2 },
+        ],
       },
       Jan: {
         url: "https://yasb.app/?f=Scum%20and%20Villainy&d=v10ZsZ50Z119X121WW93WW105WY103X121WWW453W71WWWW153W89Y719X121W608W445&sn=Hvis%20jeg%20taber%20er%20det%20Lukas%20skyld&obs=coreasteroid5,coreasteroid1,coreasteroid2",
         name: "Hvis jeg taber er det Lukas skyld",
         faction: "Scum and Villainy",
+        ships: [
+          { slug: "kihraxzfighter", name: "Kihraxz Fighter", count: 1 },
+          { slug: "firesprayclasspatrolcraft", name: "Firespray-class Patrol Craft", count: 1 },
+          { slug: "fangfighter", name: "Fang Fighter", count: 1 },
+        ],
       },
       Lukas: {
         url: "https://yasb.app/?f=Separatist%20Alliance&d=v10ZsZ50Z429XWWW218WW92WW370W334Y357XW127W255W633WW625Y272X204WWWWW624W425WW106W216&sn=Bedre%20end%20Jans%20Build&obs=gascloud1,gascloud2,gascloud3",
         name: "Bedre end Jans Build",
         faction: "Separatist Alliance",
+        ships: [
+          { slug: "firesprayclasspatrolcraft", name: "Firespray-class Patrol Craft", count: 1 },
+          { slug: "nantexclassstarfighter", name: "Nantex-Class Starfighter", count: 1 },
+          { slug: "sithinfiltrator", name: "Sith Infiltrator", count: 1 },
+        ],
       },
       Daniel: {
         url: "https://yasb.app/?f=Rebel%20Alliance&d=v10ZsZ50Z1XW4WW142Y1XW4WW142Y1XW4WW142Y33XWW333W453WW639Y31XW51W46WW639&sn=Blue%20Squadron&obs=core2asteroid0,core2asteroid2,coreasteroid0",
         name: "Blue Squadron",
         faction: "Rebel Alliance",
+        ships: [
+          { slug: "t65xwing", name: "T-65 X-wing", count: 3 },
+          { slug: "ut60duwing", name: "UT-60D U-wing", count: 2 },
+        ],
       },
     };
     const ROUNDS = [
@@ -429,6 +488,26 @@
       const build = BUILDS[name];
       if (!build) return name;
       return `<a href="${build.url}" target="_blank" rel="noopener noreferrer">${name}</a>`;
+    }
+
+    function renderFaction(faction) {
+      const slug = FACTION_ICONS[faction];
+      const icon = slug
+        ? `<i class="xwing-miniatures-font xwing-miniatures-font-${slug}" title="${faction}" aria-label="${faction}"></i>`
+        : "";
+      return `<span class="faction-cell">${icon}<span>${faction}</span></span>`;
+    }
+
+    function renderShipIcons(ships) {
+      const icons = [];
+      for (const { slug, name, count } of ships) {
+        for (let i = 0; i < count; i++) {
+          icons.push(
+            `<i class="xwing-miniatures-ship xwing-miniatures-ship-${slug}" title="${name}" aria-label="${name}"></i>`
+          );
+        }
+      }
+      return `<div class="ship-icons">${icons.join("")}</div>`;
     }
 
     function matrixCell(row, col) {
@@ -581,7 +660,8 @@
         tr.innerHTML =
           `<td>${playerLink(player)}</td>` +
           `<td>${build.name}</td>` +
-          `<td class="faction">${build.faction}</td>` +
+          `<td>${renderShipIcons(build.ships)}</td>` +
+          `<td>${renderFaction(build.faction)}</td>` +
           `<td><a href="${build.url}" target="_blank" rel="noopener noreferrer">Open in YASB</a></td>`;
         buildsBody.appendChild(tr);
       }
