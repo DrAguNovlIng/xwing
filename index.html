@@ -17,6 +17,9 @@
       --stroke-strong: #b8b8b0;
       --accent: #3b6fd8;
       --accent-text: #ffffff;
+      --win: #2d8a4e;
+      --win-fill: #e6f4eb;
+      --done-stroke: #9aa89f;
     }
 
     @media (prefers-color-scheme: dark) {
@@ -32,6 +35,9 @@
         --stroke-strong: #5a5a5a;
         --accent: #6b93e8;
         --accent-text: #111111;
+        --win: #5cb87a;
+        --win-fill: #1e3326;
+        --done-stroke: #6a756e;
       }
     }
 
@@ -118,6 +124,29 @@
     tbody tr:nth-child(even) { background: var(--fill); }
     td.center, th.center { text-align: center; }
     .matrix td:first-child, .matrix th:first-child { font-weight: 600; }
+
+    .winner { font-weight: 650; color: var(--win); }
+    .match-done { color: var(--text-secondary); }
+    .match-pending { color: var(--text-tertiary); }
+    .round-status {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-tertiary);
+      margin-top: 2px;
+    }
+    .round-status.complete { color: var(--win); }
+    .round-status.partial { color: var(--text-secondary); }
+
+    button.pill.round-complete:not([aria-pressed="true"]) {
+      border-color: var(--win);
+    }
+    button.pill.round-partial:not([aria-pressed="true"]) {
+      border-style: dashed;
+    }
+
+    .standings { margin-top: 8px; }
+    .standings td.center, .standings th.center { text-align: center; }
 
     .pills {
       display: flex;
@@ -209,7 +238,7 @@
     <p class="lede">
       Jan, Daniel, Joonas, Lukas, and Henrik each play every other person once.
       Five rounds, two 1v1s per round, one person sitting out. Joonas sits first;
-      Lukas sits second; Henrik sits in round 4. Every pairing is unique.
+      Jan sits second; Henrik sits in round 5. Every pairing is unique.
     </p>
 
     <div class="stats">
@@ -227,6 +256,18 @@
       </div>
     </div>
 
+    <h2>Standings</h2>
+    <table class="standings">
+      <thead>
+        <tr>
+          <th>Player</th>
+          <th class="center">W</th>
+          <th class="center">L</th>
+        </tr>
+      </thead>
+      <tbody id="standings-body"></tbody>
+    </table>
+
     <h2>Schedule</h2>
     <table>
       <thead>
@@ -242,8 +283,8 @@
 
     <h2>Round diagrams</h2>
     <p class="hint">
-      Players sit on a pentagon. Blue lines are the two matches; the dashed node is sitting out.
-      Click a round to focus it.
+      Players sit on a pentagon. Blue lines are pending matches; muted lines are done.
+      Green nodes are match winners. Click a round to focus it.
     </p>
     <div class="pills" id="pills"></div>
     <div class="focus">
@@ -256,7 +297,7 @@
     <div class="minis" id="minis"></div>
 
     <h2>Who plays whom</h2>
-    <p class="hint">Cell is the round that pair meets. Diagonal is the same person.</p>
+    <p class="hint">Cell is the round that pair meets. Winner initials shown when played.</p>
     <table class="matrix">
       <thead id="matrix-head"></thead>
       <tbody id="matrix-body"></tbody>
@@ -270,16 +311,77 @@
     const SHORT = { Jan: "Ja", Daniel: "Da", Joonas: "Jo", Lukas: "Lu", Henrik: "He" };
     const ROUNDS = [
       { round: 1, bye: "Joonas", matches: [["Jan", "Lukas"], ["Daniel", "Henrik"]] },
-      { round: 2, bye: "Lukas", matches: [["Joonas", "Henrik"], ["Jan", "Daniel"]] },
-      { round: 3, bye: "Daniel", matches: [["Henrik", "Jan"], ["Lukas", "Joonas"]] },
-      { round: 4, bye: "Henrik", matches: [["Lukas", "Daniel"], ["Joonas", "Jan"]] },
-      { round: 5, bye: "Jan", matches: [["Daniel", "Joonas"], ["Henrik", "Lukas"]] },
+      { round: 2, bye: "Jan", matches: [["Daniel", "Joonas"], ["Henrik", "Lukas"]] },
+      { round: 3, bye: "Lukas", matches: [["Joonas", "Henrik"], ["Jan", "Daniel"]] },
+      { round: 4, bye: "Daniel", matches: [["Henrik", "Jan"], ["Lukas", "Joonas"]] },
+      { round: 5, bye: "Henrik", matches: [["Lukas", "Daniel"], ["Joonas", "Jan"]] },
     ];
+
+    const RESULTS = {
+      1: ["Lukas", "Daniel"],
+      2: ["Daniel", null],
+    };
 
     const pairKey = (a, b) => [a, b].sort().join("|");
     const PAIR_ROUND = {};
+    const PAIR_WINNER = {};
     for (const r of ROUNDS) {
-      for (const [a, b] of r.matches) PAIR_ROUND[pairKey(a, b)] = r.round;
+      const roundResults = RESULTS[r.round] || [];
+      r.matches.forEach(([a, b], i) => {
+        PAIR_ROUND[pairKey(a, b)] = r.round;
+        const winner = roundResults[i];
+        if (winner) PAIR_WINNER[pairKey(a, b)] = winner;
+      });
+    }
+
+    function formatMatch([a, b], winner) {
+      if (!winner) {
+        return `<span class="match-pending">${a} vs ${b}</span>`;
+      }
+      const loser = winner === a ? b : a;
+      return `<span class="match-done"><span class="winner">${winner}</span> def. ${loser}</span>`;
+    }
+
+    function roundStatus(roundNum) {
+      const round = ROUNDS.find((r) => r.round === roundNum);
+      const results = RESULTS[roundNum];
+      if (!results) return null;
+      const played = results.filter(Boolean).length;
+      if (played === 0) return null;
+      if (played === round.matches.length) return "complete";
+      return "partial";
+    }
+
+    function roundStatusLabel(roundNum) {
+      const status = roundStatus(roundNum);
+      if (status === "complete") return "Complete";
+      if (status === "partial") return "In progress";
+      return null;
+    }
+
+    function computeStandings() {
+      const record = Object.fromEntries(PLAYERS.map((p) => [p, { wins: 0, losses: 0 }]));
+      for (const r of ROUNDS) {
+        const roundResults = RESULTS[r.round] || [];
+        r.matches.forEach(([a, b], i) => {
+          const winner = roundResults[i];
+          if (!winner) return;
+          const loser = winner === a ? b : a;
+          record[winner].wins += 1;
+          record[loser].losses += 1;
+        });
+      }
+      return PLAYERS.map((p) => ({ player: p, ...record[p] }))
+        .sort((a, b) => b.wins - a.wins || a.losses - b.losses || a.player.localeCompare(b.player));
+    }
+
+    function matrixCell(row, col) {
+      if (row === col) return "—";
+      const key = pairKey(row, col);
+      const round = PAIR_ROUND[key];
+      const winner = PAIR_WINNER[key];
+      if (!winner) return `R${round}`;
+      return `R${round} · ${SHORT[winner]}`;
     }
 
     const styles = getComputedStyle(document.documentElement);
@@ -291,7 +393,19 @@
       fillStrong: styles.getPropertyValue("--fill-strong").trim(),
       stroke: styles.getPropertyValue("--stroke-strong").trim(),
       accent: styles.getPropertyValue("--accent").trim(),
+      win: styles.getPropertyValue("--win").trim(),
+      winFill: styles.getPropertyValue("--win-fill").trim(),
+      doneStroke: styles.getPropertyValue("--done-stroke").trim(),
     };
+
+    function roundWinners(roundNum) {
+      const winners = new Set();
+      const results = RESULTS[roundNum] || [];
+      for (const w of results) {
+        if (w) winners.add(w);
+      }
+      return winners;
+    }
 
     function vertex(cx, cy, r, i, n = 5) {
       const angle = -Math.PI / 2 + (i * 2 * Math.PI) / n;
@@ -322,27 +436,32 @@
       poly.setAttribute("stroke-width", "1");
       svg.appendChild(poly);
 
-      for (const [a, b] of round.matches) {
+      const roundResults = RESULTS[round.round] || [];
+      const winners = roundWinners(round.round);
+
+      round.matches.forEach(([a, b], i) => {
+        const winner = roundResults[i];
         const line = document.createElementNS(ns, "line");
         line.setAttribute("x1", byName[a].x);
         line.setAttribute("y1", byName[a].y);
         line.setAttribute("x2", byName[b].x);
         line.setAttribute("y2", byName[b].y);
-        line.setAttribute("stroke", colors.accent);
+        line.setAttribute("stroke", winner ? colors.doneStroke : colors.accent);
         line.setAttribute("stroke-width", compact ? "2.5" : "3.5");
         line.setAttribute("stroke-linecap", "round");
         svg.appendChild(line);
-      }
+      });
 
       for (const n of nodes) {
         const isBye = n.name === round.bye;
+        const isWinner = winners.has(n.name);
         const g = document.createElementNS(ns, "g");
         const circle = document.createElementNS(ns, "circle");
         circle.setAttribute("cx", n.x);
         circle.setAttribute("cy", n.y);
         circle.setAttribute("r", nodeR);
-        circle.setAttribute("fill", isBye ? colors.fill : colors.fillStrong);
-        circle.setAttribute("stroke", isBye ? colors.stroke : colors.accent);
+        circle.setAttribute("fill", isBye ? colors.fill : isWinner ? colors.winFill : colors.fillStrong);
+        circle.setAttribute("stroke", isBye ? colors.stroke : isWinner ? colors.win : colors.accent);
         circle.setAttribute("stroke-width", isBye ? "1.5" : compact ? "2" : "2.5");
         if (isBye) circle.setAttribute("stroke-dasharray", "3 2");
         g.appendChild(circle);
@@ -352,7 +471,7 @@
         initials.setAttribute("y", n.y + 1);
         initials.setAttribute("text-anchor", "middle");
         initials.setAttribute("dominant-baseline", "middle");
-        initials.setAttribute("fill", colors.text);
+        initials.setAttribute("fill", isWinner ? colors.win : colors.text);
         initials.setAttribute("font-size", compact ? "9" : "11");
         initials.setAttribute("font-weight", "600");
         initials.textContent = compact ? SHORT[n.name] : n.name.slice(0, 2);
@@ -363,9 +482,9 @@
           label.setAttribute("x", n.x);
           label.setAttribute("y", n.y + nodeR + 14);
           label.setAttribute("text-anchor", "middle");
-          label.setAttribute("fill", isBye ? colors.textTertiary : colors.textSecondary);
+          label.setAttribute("fill", isBye ? colors.textTertiary : isWinner ? colors.win : colors.textSecondary);
           label.setAttribute("font-size", "11");
-          label.textContent = isBye ? `${n.name} · bye` : n.name;
+          label.textContent = isBye ? `${n.name} · bye` : isWinner ? `${n.name} · win` : n.name;
           g.appendChild(label);
         }
         svg.appendChild(g);
@@ -386,10 +505,12 @@
       focus.replaceChildren(diagramSvg(current, 280, false));
       document.getElementById("focus-caption").textContent =
         `Circle method · pentagon pairing for round ${current.round}`;
+      const status = roundStatusLabel(current.round);
+      const roundResults = RESULTS[current.round] || [];
       document.getElementById("focus-meta").innerHTML =
-        `<h3>Round ${current.round}</h3>` +
+        `<h3>Round ${current.round}${status ? ` <span class="round-status ${roundStatus(current.round)}">${status}</span>` : ""}</h3>` +
         `<p><strong>Sitting out:</strong> ${current.bye}</p>` +
-        current.matches.map(([a, b]) => `<p><strong>${a}</strong> vs <strong>${b}</strong></p>`).join("");
+        current.matches.map(([a, b], i) => `<p>${formatMatch([a, b], roundResults[i] || null)}</p>`).join("");
 
       document.querySelectorAll(".mini").forEach((el) => {
         el.classList.toggle("active", el.dataset.round === String(selected));
@@ -397,13 +518,25 @@
     }
 
     function init() {
-      const scheduleBody = document.getElementById("schedule-body");
-      for (const r of ROUNDS) {
+      const standingsBody = document.getElementById("standings-body");
+      for (const { player, wins, losses } of computeStandings()) {
         const tr = document.createElement("tr");
         tr.innerHTML =
-          `<td>Round ${r.round}</td>` +
-          `<td>${r.matches[0][0]} vs ${r.matches[0][1]}</td>` +
-          `<td>${r.matches[1][0]} vs ${r.matches[1][1]}</td>` +
+          `<td>${player}</td>` +
+          `<td class="center">${wins}</td>` +
+          `<td class="center">${losses}</td>`;
+        standingsBody.appendChild(tr);
+      }
+
+      const scheduleBody = document.getElementById("schedule-body");
+      for (const r of ROUNDS) {
+        const roundResults = RESULTS[r.round] || [];
+        const status = roundStatusLabel(r.round);
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          `<td>Round ${r.round}${status ? `<span class="round-status ${roundStatus(r.round)}">${status}</span>` : ""}</td>` +
+          `<td>${formatMatch(r.matches[0], roundResults[0] || null)}</td>` +
+          `<td>${formatMatch(r.matches[1], roundResults[1] || null)}</td>` +
           `<td>${r.bye}</td>`;
         scheduleBody.appendChild(tr);
       }
@@ -412,7 +545,8 @@
       for (const r of ROUNDS) {
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.className = "pill";
+        const status = roundStatus(r.round);
+        btn.className = "pill" + (status === "complete" ? " round-complete" : status === "partial" ? " round-partial" : "");
         btn.dataset.round = String(r.round);
         btn.textContent = `Round ${r.round}`;
         btn.addEventListener("click", () => {
@@ -447,7 +581,7 @@
         const tr = document.createElement("tr");
         const cells = PLAYERS.map((col) => {
           if (row === col) return `<td class="center">—</td>`;
-          return `<td class="center">R${PAIR_ROUND[pairKey(row, col)]}</td>`;
+          return `<td class="center">${matrixCell(row, col)}</td>`;
         }).join("");
         tr.innerHTML = `<td>${row}</td>` + cells;
         body.appendChild(tr);
