@@ -275,7 +275,7 @@
     <p class="lede">
       Jan, Daniel, Joonas, Lukas, and Henrik each play every other person once.
       Five rounds, two 1v1s per round, one person sitting out. Joonas sits first;
-      Jan sits second; Henrik sits in round 5. Every pairing is unique.
+      Jan sits second; Henrik sits in round 4. Every pairing is unique.
     </p>
 
     <div class="stats">
@@ -422,13 +422,13 @@
       { round: 1, bye: "Joonas", matches: [["Jan", "Lukas"], ["Daniel", "Henrik"]] },
       { round: 2, bye: "Jan", matches: [["Daniel", "Joonas"], ["Henrik", "Lukas"]] },
       { round: 3, bye: "Lukas", matches: [["Joonas", "Henrik"], ["Jan", "Daniel"]] },
-      { round: 4, bye: "Daniel", matches: [["Henrik", "Jan"], ["Lukas", "Joonas"]] },
-      { round: 5, bye: "Henrik", matches: [["Lukas", "Daniel"], ["Joonas", "Jan"]] },
+      { round: 4, bye: "Henrik", matches: [["Lukas", "Daniel"], ["Joonas", "Jan"]] },
+      { round: 5, bye: "Daniel", matches: [["Henrik", "Jan"], ["Lukas", "Joonas"]] },
     ];
 
     const RESULTS = {
       1: ["Lukas", "Daniel"],
-      2: ["Daniel", null],
+      2: ["Daniel", "Lukas"],
     };
 
     const pairKey = (a, b) => [a, b].sort().join("|");
