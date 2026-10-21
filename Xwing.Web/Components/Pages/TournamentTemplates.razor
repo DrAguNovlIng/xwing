@@ -1,0 +1,124 @@
+@page "/tournament-templates"
+
+@attribute [Authorize(Roles = UserRoles.Admin)]
+
+@using Xwing.Web.Components.Dialogs
+@using Xwing.Web.Data
+@inject ITournamentTemplateStore TemplateStore
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+
+<PageTitle>Tournament templates</PageTitle>
+
+<MudToolBar Gutters="false" Class="mb-4" WrapContent="true">
+    <MudText Typo="Typo.h4">Tournament templates</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="OpenCreateDialogAsync">
+        Add template
+    </MudButton>
+</MudToolBar>
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <MudAlert Severity="@statusSeverity" Class="mb-4" Dense="true">@statusMessage</MudAlert>
+}
+<MudTable Items="templates" Hover="true" Dense="true">
+    <HeaderContent>
+        <MudTh>Name</MudTh>
+        <MudTh Style="width: 14rem;">Actions</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Name">@context.Name</MudTd>
+        <MudTd>
+            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => OpenEditor(context.TournamentTemplateId))">Edit graph</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => OpenEditDialogAsync(context))">Rename</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error" OnClick="@(() => DeleteAsync(context))">Delete</MudButton>
+        </MudTd>
+    </RowTemplate>
+</MudTable>
+
+@code {
+    private static readonly DialogOptions dialogOptions = new()
+    {
+        CloseButton = true,
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+    };
+
+    private IReadOnlyList<TournamentTemplate> templates = [];
+
+    private string? statusMessage;
+
+    private Severity statusSeverity = Severity.Info;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        templates = await TemplateStore.ListAsync(CancellationToken.None);
+    }
+
+    private void OpenEditor(int tournamentTemplateId)
+    {
+        Navigation.NavigateTo($"/tournament-templates/{tournamentTemplateId}");
+    }
+
+    private async Task OpenCreateDialogAsync()
+    {
+        IDialogReference dialog = await DialogService.ShowAsync<TournamentTemplateFormDialog>(
+            "Add template",
+            dialogOptions);
+        DialogResult? result = await dialog.Result;
+        if (result is null || result.Canceled)
+        {
+            return;
+        }
+        ShowStatus("Template created.", Severity.Success);
+        await ReloadAsync();
+    }
+
+    private async Task OpenEditDialogAsync(TournamentTemplate template)
+    {
+        var parameters = new DialogParameters<TournamentTemplateFormDialog>
+        {
+            { x => x.Template, template },
+        };
+        IDialogReference dialog = await DialogService.ShowAsync<TournamentTemplateFormDialog>(
+            "Rename template",
+            parameters,
+            dialogOptions);
+        DialogResult? result = await dialog.Result;
+        if (result is null || result.Canceled)
+        {
+            return;
+        }
+        ShowStatus("Template updated.", Severity.Success);
+        await ReloadAsync();
+    }
+
+    private async Task DeleteAsync(TournamentTemplate template)
+    {
+        Result result = await TemplateStore.DeleteAsync(
+            template.TournamentTemplateId,
+            template.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Delete failed.", Severity.Error);
+            return;
+        }
+        ShowStatus("Template deleted.", Severity.Success);
+        await ReloadAsync();
+    }
+
+    private void ShowStatus(string message, Severity severity)
+    {
+        statusMessage = message;
+        statusSeverity = severity;
+    }
+}
