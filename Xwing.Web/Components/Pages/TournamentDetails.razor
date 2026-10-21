@@ -1,0 +1,380 @@
+@page "/tournaments/{TournamentId:int}"
+
+@attribute [Authorize]
+
+@using System.Globalization
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Xwing.Web.Components.Dialogs
+@using Xwing.Web.Data
+@inject ITournamentStore TournamentStore
+
+@inject TimeProvider TimeProvider
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IDialogService DialogService
+
+@implements IDisposable
+
+<PageTitle>@(tournament?.Name ?? "Tournament")</PageTitle>
+
+@if (loading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (tournament is null)
+{
+    <MudText Typo="Typo.h5" Class="mb-2">Tournament not found</MudText>
+    <MudButton Variant="Variant.Text" Href="/tournaments">Back to tournaments</MudButton>
+}
+else
+{
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Wrap="Wrap.Wrap">
+        <MudButton Variant="Variant.Text"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   Href="/tournaments">
+            Tournaments
+        </MudButton>
+    </MudStack>
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <MudAlert Severity="@statusSeverity" Class="mb-4" Dense="true">@statusMessage</MudAlert>
+    }
+    <MudText Typo="Typo.h4" Class="mb-2">@tournament.Name</MudText>
+    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(tournament)">@GetStatusLabel(tournament)</MudChip>
+        <MudText Typo="Typo.body2">Start: @FormatDate(tournament.StartDateUtc)</MudText>
+        <MudText Typo="Typo.body2">End: @FormatDate(tournament.EndDateUtc)</MudText>
+    </MudStack>
+    @if (!string.IsNullOrEmpty(joinTimeLeftLabel))
+    {
+        <MudText Typo="Typo.body2" Class="mb-4">@joinTimeLeftLabel</MudText>
+    }
+    @if (rosterOpen)
+    {
+        @if (currentUserJoined)
+        {
+            <MudStack Row="true" Spacing="2" Class="mb-4" Wrap="Wrap.Wrap">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           Disabled="actionInProgress"
+                           OnClick="OpenSquadDialogAsync">
+                    @(CurrentUserHasSquad ? "Change squad" : "Add squad")
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           Disabled="actionInProgress"
+                           OnClick="ConfirmLeaveAsync">
+                    Leave tournament
+                </MudButton>
+            </MudStack>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Class="mb-4"
+                       Disabled="actionInProgress"
+                       OnClick="JoinAsync">
+                Join tournament
+            </MudButton>
+        }
+    }
+    else
+    {
+        <MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">The roster is closed for this tournament.</MudText>
+    }
+    <MudText Typo="Typo.h6" Class="mb-2">Participants</MudText>
+    @if (members.Count == 0)
+    {
+        <MudText>No one has joined yet.</MudText>
+    }
+    else
+    {
+        <MudStack Spacing="2">
+            @foreach (TournamentMember member in members)
+            {
+                <MudPaper Class="pa-3" Elevation="0" Outlined="true">
+                    <MudText Typo="Typo.subtitle1">@member.UserName</MudText>
+                    @if (!string.IsNullOrEmpty(member.SquadFactionDisplay))
+                    {
+                        <div class="squad-faction-row">
+                            @if (GetFactionIconSlug(member.SquadFactionDisplay) is string factionSlug)
+                            {
+                                <i class="@($"xwing-miniatures-font xwing-miniatures-font-{factionSlug}")"
+                                   aria-hidden="true"></i>
+                            }
+                            <MudText Typo="Typo.body2">@member.SquadFactionDisplay</MudText>
+                        </div>
+                        <div class="squad-ship-icons">
+                            @for (int shipIndex = 0; shipIndex < member.SquadShipIds.Count; shipIndex++)
+                            {
+                                string shipLabel = member.SquadShipLabels[shipIndex];
+                                string shipSlug = GetShipIconSlug(member.SquadShipIds[shipIndex]);
+                                <span aria-label="@shipLabel">
+                                    <i class="@($"xwing-miniatures-ship xwing-miniatures-ship-{shipSlug}")"
+                                       aria-hidden="true"></i>
+                                </span>
+                            }
+                        </div>
+                        <MudText Typo="Typo.body2">@FormatShipList(member.SquadShipLabels)</MudText>
+                        @if (!string.IsNullOrEmpty(member.SquadUrl))
+                        {
+                            <MudLink Href="@member.SquadUrl" Target="_blank" Class="mt-1 d-inline-block">
+                                View build
+                            </MudLink>
+                        }
+                    }
+                </MudPaper>
+            }
+        </MudStack>
+    }
+}
+
+@code {
+    [Parameter]
+    public int TournamentId { get; set; }
+
+    private Tournament? tournament;
+
+    private IReadOnlyList<TournamentMember> members = [];
+
+    private bool loading = true;
+
+    private bool actionInProgress;
+
+    private int? currentUserId;
+
+    private DateTimeOffset todayUtc;
+
+    private string? statusMessage;
+
+    private Severity statusSeverity = Severity.Info;
+
+    private bool rosterOpen;
+
+    private bool currentUserJoined;
+
+    private string? joinTimeLeftLabel;
+
+    private PeriodicTimer? countdownTimer;
+
+    private CancellationTokenSource? countdownCts;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await StopCountdownAsync().ConfigureAwait(false);
+        loading = true;
+        statusMessage = null;
+        todayUtc = TournamentSchedule.TodayUtc(TimeProvider);
+        AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync().ConfigureAwait(false);
+        string? idClaim = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        currentUserId = int.TryParse(idClaim, CultureInfo.InvariantCulture, out int parsedId) ? parsedId : null;
+        tournament = await TournamentStore.GetAsync(TournamentId, CancellationToken.None).ConfigureAwait(false);
+        if (tournament is not null)
+        {
+            members = await TournamentStore.ListMembersAsync(TournamentId, CancellationToken.None).ConfigureAwait(false);
+            RefreshRosterState();
+            currentUserJoined = currentUserId is int uid && members.Any(m => m.UserId == uid);
+        }
+        else
+        {
+            joinTimeLeftLabel = null;
+            rosterOpen = false;
+        }
+        loading = false;
+        if (tournament is not null && TournamentSchedule.TimeLeftToJoinUsesMinuteRefresh(tournament, TimeProvider.GetUtcNow()))
+        {
+            StartCountdownTimer();
+        }
+    }
+
+    public void Dispose()
+    {
+        countdownCts?.Cancel();
+        countdownCts?.Dispose();
+        countdownTimer?.Dispose();
+    }
+
+    private void RefreshRosterState()
+    {
+        if (tournament is null)
+        {
+            rosterOpen = false;
+            joinTimeLeftLabel = null;
+            return;
+        }
+        todayUtc = TournamentSchedule.TodayUtc(TimeProvider);
+        rosterOpen = TournamentSchedule.GetStatus(tournament, todayUtc) == TournamentLifecycleStatus.Upcoming;
+        joinTimeLeftLabel = rosterOpen
+            ? TournamentSchedule.FormatTimeLeftToJoin(tournament, TimeProvider.GetUtcNow())
+            : null;
+        if (joinTimeLeftLabel is null)
+        {
+            rosterOpen = false;
+        }
+    }
+
+    private void StartCountdownTimer()
+    {
+        countdownCts = new CancellationTokenSource();
+        countdownTimer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+        _ = RunCountdownLoopAsync(countdownCts.Token);
+    }
+
+    private async Task StopCountdownAsync()
+    {
+        if (countdownCts is not null)
+        {
+            await countdownCts.CancelAsync().ConfigureAwait(false);
+            countdownCts.Dispose();
+            countdownCts = null;
+        }
+        countdownTimer?.Dispose();
+        countdownTimer = null;
+    }
+
+    private async Task RunCountdownLoopAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (countdownTimer is not null && await countdownTimer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            {
+                await InvokeAsync(() =>
+                {
+                    RefreshRosterState();
+                    StateHasChanged();
+                }).ConfigureAwait(false);
+                if (!rosterOpen || tournament is null ||
+                    !TournamentSchedule.TimeLeftToJoinUsesMinuteRefresh(tournament, TimeProvider.GetUtcNow()))
+                {
+                    await StopCountdownAsync().ConfigureAwait(false);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Countdown stopped when the page is disposed or the roster closes.
+        }
+    }
+
+    private bool CurrentUserHasSquad =>
+        currentUserId is int uid &&
+        members.Any(m => m.UserId == uid && !string.IsNullOrEmpty(m.SquadUrl));
+
+    private async Task OpenSquadDialogAsync()
+    {
+        if (currentUserId is not int userId)
+        {
+            return;
+        }
+        var parameters = new DialogParameters<TournamentSquadDialog>
+        {
+            { x => x.TournamentId, TournamentId },
+            { x => x.UserId, userId },
+            { x => x.HasExistingSquad, CurrentUserHasSquad },
+        };
+        IDialogReference dialog = await DialogService.ShowAsync<TournamentSquadDialog>(
+            string.Empty,
+            parameters,
+            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true }).ConfigureAwait(false);
+        DialogResult? result = await dialog.Result.ConfigureAwait(false);
+        if (result is not null && !result.Canceled)
+        {
+            await ReloadMembersAsync().ConfigureAwait(false);
+            ShowStatus("Squad saved.", Severity.Success);
+        }
+    }
+
+    private async Task ConfirmLeaveAsync()
+    {
+        IDialogReference dialog = await DialogService.ShowAsync<LeaveTournamentConfirmDialog>(
+            string.Empty,
+            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true }).ConfigureAwait(false);
+        DialogResult? result = await dialog.Result.ConfigureAwait(false);
+        if (result is not null && !result.Canceled && result.Data is true)
+        {
+            await LeaveAsync().ConfigureAwait(false);
+        }
+    }
+
+    private async Task JoinAsync()
+    {
+        if (currentUserId is not int userId)
+        {
+            return;
+        }
+        actionInProgress = true;
+        statusMessage = null;
+        Result result = await TournamentStore.JoinAsync(TournamentId, userId, CancellationToken.None).ConfigureAwait(false);
+        actionInProgress = false;
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error!, Severity.Error);
+            return;
+        }
+        await ReloadMembersAsync().ConfigureAwait(false);
+        ShowStatus("You joined the tournament.", Severity.Success);
+    }
+
+    private async Task LeaveAsync()
+    {
+        if (currentUserId is not int userId)
+        {
+            return;
+        }
+        actionInProgress = true;
+        statusMessage = null;
+        Result result = await TournamentStore.LeaveAsync(TournamentId, userId, CancellationToken.None).ConfigureAwait(false);
+        actionInProgress = false;
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error!, Severity.Error);
+            return;
+        }
+        await ReloadMembersAsync().ConfigureAwait(false);
+        ShowStatus("You left the tournament.", Severity.Success);
+    }
+
+    private async Task ReloadMembersAsync()
+    {
+        members = await TournamentStore.ListMembersAsync(TournamentId, CancellationToken.None).ConfigureAwait(false);
+        currentUserJoined = currentUserId is int uid && members.Any(m => m.UserId == uid);
+    }
+
+    private TournamentLifecycleStatus GetLifecycleStatus(Tournament t) =>
+        TournamentSchedule.GetStatus(t, todayUtc);
+
+    private string GetStatusLabel(Tournament t) =>
+        GetLifecycleStatus(t) switch
+        {
+            TournamentLifecycleStatus.Upcoming => "Upcoming",
+            TournamentLifecycleStatus.InProgress => "In progress",
+            _ => "Past",
+        };
+
+    private Color GetStatusColor(Tournament t) =>
+        GetLifecycleStatus(t) switch
+        {
+            TournamentLifecycleStatus.Upcoming => Color.Info,
+            TournamentLifecycleStatus.InProgress => Color.Success,
+            _ => Color.Error,
+        };
+
+    private static string FormatDate(DateTimeOffset value) =>
+        value.UtcDateTime.ToString("d", CultureInfo.CurrentCulture);
+
+    private static string FormatShipList(IReadOnlyList<string> ships) =>
+        ships.Count == 0 ? string.Empty : string.Join(", ", ships);
+
+    private static string? GetFactionIconSlug(string factionDisplayName) =>
+        XwaSquad.GetFactionIconSlug(factionDisplayName);
+
+    private static string GetShipIconSlug(string shipId) =>
+        XwaSquad.GetShipIconSlug(shipId);
+
+    private void ShowStatus(string message, Severity severity)
+    {
+        statusMessage = message;
+        statusSeverity = severity;
+    }
+}

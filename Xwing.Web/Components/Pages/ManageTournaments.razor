@@ -28,17 +28,20 @@
 <MudTable Items="tournaments" Hover="true" Dense="true">
     <HeaderContent>
         <MudTh>Name</MudTh>
+        <MudTh>Players</MudTh>
         <MudTh>Start</MudTh>
         <MudTh>End</MudTh>
-        <MudTh Style="width: 12rem;">Actions</MudTh>
+        <MudTh Style="width: 16rem;">Actions</MudTh>
     </HeaderContent>
     <RowTemplate>
-        <MudTd DataLabel="Name">@context.Name</MudTd>
-        <MudTd DataLabel="Start">@FormatDate(context.StartDateUtc)</MudTd>
-        <MudTd DataLabel="End">@FormatDate(context.EndDateUtc)</MudTd>
+        <MudTd DataLabel="Name">@context.Tournament.Name</MudTd>
+        <MudTd DataLabel="Players">@context.ParticipantCount</MudTd>
+        <MudTd DataLabel="Start">@FormatDate(context.Tournament.StartDateUtc)</MudTd>
+        <MudTd DataLabel="End">@FormatDate(context.Tournament.EndDateUtc)</MudTd>
         <MudTd>
-            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => OpenEditDialogAsync(context))">Edit</MudButton>
-            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error" OnClick="@(() => DeleteAsync(context.TournamentId))">Delete</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Text" Href="@($"/tournaments/{context.Tournament.TournamentId}")">Open</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => OpenEditDialogAsync(context.Tournament))">Edit</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error" OnClick="@(() => DeleteAsync(context.Tournament.TournamentId))">Delete</MudButton>
         </MudTd>
     </RowTemplate>
 </MudTable>
@@ -51,7 +54,7 @@
         FullWidth = true,
     };
 
-    private IReadOnlyList<Tournament> tournaments = [];
+    private IReadOnlyList<TournamentListItem> tournaments = [];
 
     private string? statusMessage;
 

@@ -149,6 +149,54 @@ namespace Xwing.Web.Data.Migrations
                     b.ToTable("Tournaments", (string)null);
                 });
 
+            modelBuilder.Entity("Xwing.Web.Data.TournamentParticipant", b =>
+                {
+                    b.Property<int>("TournamentParticipantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TournamentParticipantId"));
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SquadFaction")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SquadShipsJson")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("SquadUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset>("TimeCreatedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("TimeUpdatedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("TournamentId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("TournamentParticipantId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("TournamentId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("TournamentParticipants", (string)null);
+                });
+
             modelBuilder.Entity("Xwing.Web.Data.TournamentTemplate", b =>
                 {
                     b.Property<int>("TournamentTemplateId")
@@ -250,6 +298,25 @@ namespace Xwing.Web.Data.Migrations
                     b.Navigation("SourceMatch");
 
                     b.Navigation("TargetMatch");
+                });
+
+            modelBuilder.Entity("Xwing.Web.Data.TournamentParticipant", b =>
+                {
+                    b.HasOne("Xwing.Web.Data.Tournament", "Tournament")
+                        .WithMany()
+                        .HasForeignKey("TournamentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Xwing.Web.Data.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tournament");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Xwing.Web.Data.TemplateMatch", b =>

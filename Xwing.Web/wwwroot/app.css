@@ -36,3 +36,28 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+.squad-faction-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.squad-faction-row .xwing-miniatures-font {
+    font-size: 22px;
+    line-height: 1;
+}
+
+.squad-ship-icons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-top: 4px;
+}
+
+.squad-ship-icons .xwing-miniatures-ship {
+    font-size: 28px;
+    line-height: 1;
+}

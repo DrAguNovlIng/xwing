@@ -40,18 +40,22 @@
           Dense="true"
           SortLabel="Sort">
     <HeaderContent>
-        <MudTh><MudTableSortLabel T="Tournament" SortLabel="Name">Name</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="TournamentListItem" SortLabel="Name">Name</MudTableSortLabel></MudTh>
+        <MudTh>Players</MudTh>
         <MudTh>Status</MudTh>
-        <MudTh><MudTableSortLabel T="Tournament" SortLabel="Start" InitialDirection="SortDirection.Ascending">Start</MudTableSortLabel></MudTh>
-        <MudTh><MudTableSortLabel T="Tournament" SortLabel="End">End</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="TournamentListItem" SortLabel="Start" InitialDirection="SortDirection.Ascending">Start</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="TournamentListItem" SortLabel="End">End</MudTableSortLabel></MudTh>
     </HeaderContent>
     <RowTemplate>
-        <MudTd DataLabel="Name">@context.Name</MudTd>
-        <MudTd DataLabel="Status">
-            <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context)">@GetStatusLabel(context)</MudChip>
+        <MudTd DataLabel="Name">
+            <MudLink Href="@($"/tournaments/{context.Tournament.TournamentId}")" Underline="Underline.Hover">@context.Tournament.Name</MudLink>
         </MudTd>
-        <MudTd DataLabel="Start">@FormatDate(context.StartDateUtc)</MudTd>
-        <MudTd DataLabel="End">@FormatDate(context.EndDateUtc)</MudTd>
+        <MudTd DataLabel="Players">@context.ParticipantCount</MudTd>
+        <MudTd DataLabel="Status">
+            <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Tournament)">@GetStatusLabel(context.Tournament)</MudChip>
+        </MudTd>
+        <MudTd DataLabel="Start">@FormatDate(context.Tournament.StartDateUtc)</MudTd>
+        <MudTd DataLabel="End">@FormatDate(context.Tournament.EndDateUtc)</MudTd>
     </RowTemplate>
     <NoRecordsContent>
         <MudText>No tournaments match your search.</MudText>
@@ -59,7 +63,7 @@
 </MudTable>
 
 @code {
-    private MudTable<Tournament>? table;
+    private MudTable<TournamentListItem>? table;
 
     private string nameSearch = string.Empty;
 
@@ -72,7 +76,7 @@
         todayUtc = TournamentSchedule.TodayUtc(TimeProvider);
     }
 
-    private async Task<TableData<Tournament>> LoadServerDataAsync(TableState state, CancellationToken cancellationToken)
+    private async Task<TableData<TournamentListItem>> LoadServerDataAsync(TableState state, CancellationToken cancellationToken)
     {
         todayUtc = TournamentSchedule.TodayUtc(TimeProvider);
         var query = new TournamentSearchQuery
@@ -82,8 +86,8 @@
             SortField = MapSortField(state.SortLabel),
             SortDescending = state.SortDirection == SortDirection.Descending,
         };
-        IReadOnlyList<Tournament> items = await TournamentStore.SearchAsync(query, cancellationToken);
-        return new TableData<Tournament>
+        IReadOnlyList<TournamentListItem> items = await TournamentStore.SearchAsync(query, cancellationToken);
+        return new TableData<TournamentListItem>
         {
             Items = items,
             TotalItems = items.Count,

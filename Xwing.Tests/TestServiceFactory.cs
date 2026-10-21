@@ -36,6 +36,7 @@ internal static class TestServiceFactory
         await db.TemplateMatchFeeds.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
         await db.TemplateMatches.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
         await db.TournamentTemplates.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+        await db.TournamentParticipants.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
         await db.Tournaments.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
         await db.Users.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
     }
