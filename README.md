@@ -72,9 +72,21 @@ Production data lives in **Azure SQL Database**. Local development uses the SQL 
 
    Do not commit connection strings. [.gitignore](.gitignore) ignores local `appsettings*.json`.
 
-6. Deploy or restart the web app. On startup, **Xwing.Web** applies EF Core migrations and creates the **`Tournaments`** table if it is missing (columns include `TournamentId`, `Name`, audit timestamps, and `RowVersion`).
+6. Deploy or restart the web app. On startup, **Xwing.Web** applies EF Core migrations and creates the **`Tournaments`** and **`Users`** tables if they are missing.
 
 Pull requests and pushes run `dotnet test` in GitHub Actions (Docker is available on `ubuntu-latest` runners).
+
+## Admin login and CRUD
+
+The first time you open the site, you are sent to **`/users`** to create the first admin account. Passwords are hashed in the database; they are never shown after save.
+
+After an admin exists:
+
+- **`/`** (also **`/login`**) — sign in (form post sets a persistent auth cookie, about 400 days, sliding expiration). Successful sign-in goes to **`/tournaments`** by default.
+- **`/tournaments`** — admin-only tournament create, edit, and delete.
+- **`/users`** — admin-only user create, edit (optional new password), and delete. The last admin cannot be deleted.
+
+Logout uses a form post from the app bar and clears the cookie. There is no default password in source or configuration.
 
 ### 2. Entra app registration for GitHub Actions
 

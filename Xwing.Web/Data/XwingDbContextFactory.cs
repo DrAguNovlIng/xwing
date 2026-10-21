@@ -9,7 +9,6 @@ public sealed class XwingDbContextFactory : IDesignTimeDbContextFactory<XwingDbC
     {
         var optionsBuilder = new DbContextOptionsBuilder<XwingDbContext>();
         optionsBuilder.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=XwingDesignTime;Trusted_Connection=True;TrustServerCertificate=True");
-
         return new XwingDbContext(optionsBuilder.Options, TimeProvider.System);
     }
 }

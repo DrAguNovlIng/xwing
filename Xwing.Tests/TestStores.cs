@@ -1,24 +1,21 @@
-using Xwing.Web.Data;
 using Xwing.Web.Stores;
 
 namespace Xwing.Tests;
 
 internal sealed class TestStores : IDisposable
 {
-    private readonly XwingDbContext context;
-
-    public TestStores(XwingDbContext context, ITournamentStore tournaments)
+    public void Dispose()
     {
-        ArgumentNullException.ThrowIfNull(context);
+    }
+
+    public TestStores(ITournamentStore tournaments, IUserStore users)
+    {
         ArgumentNullException.ThrowIfNull(tournaments);
-        this.context = context;
+        ArgumentNullException.ThrowIfNull(users);
         Tournaments = tournaments;
+        Users = users;
     }
 
     public ITournamentStore Tournaments { get; }
-
-    public void Dispose()
-    {
-        context.Dispose();
-    }
+    public IUserStore Users { get; }
 }

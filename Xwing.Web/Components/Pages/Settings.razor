@@ -1,0 +1,22 @@
+@page "/settings"
+<PageTitle>Settings</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Settings</MudText>
+<MudText Typo="Typo.subtitle1" Class="mb-4">Appearance</MudText>
+<MudRadioGroup T="ThemePreference"
+               Value="ThemeState.Preference"
+               ValueChanged="@(async (ThemePreference p) => await OnPreferenceChangedAsync(p))">
+    <MudRadio T="ThemePreference" Value="ThemePreference.System" Color="Color.Primary">Follow system</MudRadio>
+    <MudRadio T="ThemePreference" Value="ThemePreference.Light" Color="Color.Primary">Light</MudRadio>
+    <MudRadio T="ThemePreference" Value="ThemePreference.Dark" Color="Color.Primary">Dark</MudRadio>
+</MudRadioGroup>
+
+@code {
+    [CascadingParameter]
+    public ThemePreferenceState ThemeState { get; set; } = default!;
+
+    private async Task OnPreferenceChangedAsync(ThemePreference preference)
+    {
+        await ThemeState.SetPreferenceAsync(preference);
+    }
+}

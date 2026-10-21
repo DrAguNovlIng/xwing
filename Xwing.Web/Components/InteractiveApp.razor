@@ -1,0 +1,74 @@
+@using Xwing.Web.Theme
+@inject IHttpContextAccessor HttpContextAccessor
+
+@inject IJSRuntime JsRuntime
+
+@* Single interactive root so Mud providers and pages share one circuit (dialogs, OnClick, etc.). *@
+<CascadingValue Value="themeState">
+    <MudThemeProvider @ref="mudThemeProvider"
+                      @bind-IsDarkMode="isDarkMode"
+                      ObserveSystemDarkModeChange="observeSystem" />
+    <MudPopoverProvider />
+    <MudDialogProvider />
+    <MudSnackbarProvider />
+    <Routes />
+</CascadingValue>
+
+@code {
+    private MudThemeProvider? mudThemeProvider;
+
+    private bool isDarkMode;
+
+    private bool observeSystem = true;
+
+    private readonly ThemePreferenceState themeState = new();
+
+    private bool themeApplied;
+
+    protected override void OnInitialized()
+    {
+        ThemePreference fromCookie = ThemePreferenceCookie.Read(HttpContextAccessor.HttpContext);
+        themeState.Configure(fromCookie, SetPreferenceAsync);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !themeApplied && mudThemeProvider is not null)
+        {
+            await ApplyPreferenceAsync(themeState.Preference);
+            themeApplied = true;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SetPreferenceAsync(ThemePreference preference)
+    {
+        await ThemePreferenceCookie.WriteAsync(JsRuntime, preference);
+        themeState.SetPreferenceWithoutPersist(preference);
+        await ApplyPreferenceAsync(preference);
+        StateHasChanged();
+    }
+
+    private async Task ApplyPreferenceAsync(ThemePreference preference)
+    {
+        if (mudThemeProvider is null)
+        {
+            return;
+        }
+        switch (preference)
+        {
+            case ThemePreference.Light:
+                observeSystem = false;
+                isDarkMode = false;
+                break;
+            case ThemePreference.Dark:
+                observeSystem = false;
+                isDarkMode = true;
+                break;
+            default:
+                observeSystem = true;
+                isDarkMode = await mudThemeProvider.GetSystemDarkModeAsync();
+                break;
+        }
+    }
+}

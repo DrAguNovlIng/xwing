@@ -1,0 +1,123 @@
+@page "/tournaments/manage"
+
+@attribute [Authorize(Roles = UserRoles.Admin)]
+
+@using System.Globalization
+@using Xwing.Web.Components.Dialogs
+@using Xwing.Web.Data
+@using Xwing.Web.Models
+@inject ITournamentStore TournamentStore
+
+@inject IDialogService DialogService
+<PageTitle>Manage tournaments</PageTitle>
+
+<MudToolBar Gutters="false" Class="mb-4" WrapContent="true">
+    <MudText Typo="Typo.h4">Manage tournaments</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="OpenCreateDialogAsync">
+        Add tournament
+    </MudButton>
+</MudToolBar>
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <MudAlert Severity="@statusSeverity" Class="mb-4" Dense="true">@statusMessage</MudAlert>
+}
+<MudTable Items="tournaments" Hover="true" Dense="true">
+    <HeaderContent>
+        <MudTh>Name</MudTh>
+        <MudTh>Start</MudTh>
+        <MudTh>End</MudTh>
+        <MudTh Style="width: 12rem;">Actions</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Name">@context.Name</MudTd>
+        <MudTd DataLabel="Start">@FormatDate(context.StartDateUtc)</MudTd>
+        <MudTd DataLabel="End">@FormatDate(context.EndDateUtc)</MudTd>
+        <MudTd>
+            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => OpenEditDialogAsync(context))">Edit</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error" OnClick="@(() => DeleteAsync(context.TournamentId))">Delete</MudButton>
+        </MudTd>
+    </RowTemplate>
+</MudTable>
+
+@code {
+    private static readonly DialogOptions dialogOptions = new()
+    {
+        CloseButton = true,
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+    };
+
+    private IReadOnlyList<Tournament> tournaments = [];
+
+    private string? statusMessage;
+
+    private Severity statusSeverity = Severity.Info;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        tournaments = await TournamentStore.ListAsync(CancellationToken.None);
+    }
+
+    private async Task OpenCreateDialogAsync()
+    {
+        IDialogReference dialog = await DialogService.ShowAsync<TournamentFormDialog>(
+            "Add tournament",
+            dialogOptions);
+        DialogResult? result = await dialog.Result;
+        if (result is null || result.Canceled)
+        {
+            return;
+        }
+        ShowStatus("Tournament created.", Severity.Success);
+        await ReloadAsync();
+    }
+
+    private async Task OpenEditDialogAsync(Tournament tournament)
+    {
+        var parameters = new DialogParameters<TournamentFormDialog>
+        {
+            { x => x.Tournament, tournament },
+        };
+        IDialogReference dialog = await DialogService.ShowAsync<TournamentFormDialog>(
+            "Edit tournament",
+            parameters,
+            dialogOptions);
+        DialogResult? result = await dialog.Result;
+        if (result is null || result.Canceled)
+        {
+            return;
+        }
+        ShowStatus("Tournament updated.", Severity.Success);
+        await ReloadAsync();
+    }
+
+    private async Task DeleteAsync(int tournamentId)
+    {
+        Result result = await TournamentStore.DeleteAsync(tournamentId, CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error!, Severity.Error);
+            return;
+        }
+        ShowStatus("Tournament deleted.", Severity.Success);
+        await ReloadAsync();
+    }
+
+    private static string FormatDate(DateTimeOffset value) =>
+        value.UtcDateTime.ToString("d", CultureInfo.CurrentCulture);
+
+    private void ShowStatus(string message, Severity severity)
+    {
+        statusMessage = message;
+        statusSeverity = severity;
+    }
+}

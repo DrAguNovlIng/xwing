@@ -4,6 +4,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var sql = builder.AddSqlServer("sql")
     .WithLifetime(ContainerLifetime.Persistent)
+    .WithHostPort(35353)
     .WithDataVolume();
 
 var xwingDb = sql.AddDatabase("xwing");

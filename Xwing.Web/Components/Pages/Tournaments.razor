@@ -1,0 +1,140 @@
+@page "/tournaments"
+
+@attribute [Authorize]
+
+@using System.Globalization
+@using Xwing.Web.Data
+@using Xwing.Web.Stores
+@inject ITournamentStore TournamentStore
+
+@inject TimeProvider TimeProvider
+<PageTitle>Tournaments</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Tournaments</MudText>
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="4">
+        <MudTextField Value="nameSearch"
+                      ValueChanged="@(async (string v) => await OnNameSearchChangedAsync(v))"
+                      Label="Search by name"
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true"
+                      DebounceInterval="300" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4">
+        <MudSelect T="TournamentWhenFilter"
+                   Value="whenFilter"
+                   ValueChanged="@(async (TournamentWhenFilter v) => await OnWhenFilterChangedAsync(v))"
+                   Label="Show"
+                   Variant="Variant.Outlined">
+            <MudSelectItem T="TournamentWhenFilter" Value="TournamentWhenFilter.All">All</MudSelectItem>
+            <MudSelectItem T="TournamentWhenFilter" Value="TournamentWhenFilter.Active">Active</MudSelectItem>
+            <MudSelectItem T="TournamentWhenFilter" Value="TournamentWhenFilter.Past">Past</MudSelectItem>
+        </MudSelect>
+    </MudItem>
+</MudGrid>
+<MudTable @ref="table"
+          ServerData="LoadServerDataAsync"
+          Hover="true"
+          Dense="true"
+          SortLabel="Sort">
+    <HeaderContent>
+        <MudTh><MudTableSortLabel T="Tournament" SortLabel="Name">Name</MudTableSortLabel></MudTh>
+        <MudTh>Status</MudTh>
+        <MudTh><MudTableSortLabel T="Tournament" SortLabel="Start" InitialDirection="SortDirection.Ascending">Start</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="Tournament" SortLabel="End">End</MudTableSortLabel></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Name">@context.Name</MudTd>
+        <MudTd DataLabel="Status">
+            <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context)">@GetStatusLabel(context)</MudChip>
+        </MudTd>
+        <MudTd DataLabel="Start">@FormatDate(context.StartDateUtc)</MudTd>
+        <MudTd DataLabel="End">@FormatDate(context.EndDateUtc)</MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText>No tournaments match your search.</MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    private MudTable<Tournament>? table;
+
+    private string nameSearch = string.Empty;
+
+    private TournamentWhenFilter whenFilter = TournamentWhenFilter.Active;
+
+    private DateTimeOffset todayUtc;
+
+    protected override void OnInitialized()
+    {
+        todayUtc = TournamentSchedule.TodayUtc(TimeProvider);
+    }
+
+    private async Task<TableData<Tournament>> LoadServerDataAsync(TableState state, CancellationToken cancellationToken)
+    {
+        todayUtc = TournamentSchedule.TodayUtc(TimeProvider);
+        var query = new TournamentSearchQuery
+        {
+            NameSearch = string.IsNullOrWhiteSpace(nameSearch) ? null : nameSearch,
+            WhenFilter = whenFilter,
+            SortField = MapSortField(state.SortLabel),
+            SortDescending = state.SortDirection == SortDirection.Descending,
+        };
+        IReadOnlyList<Tournament> items = await TournamentStore.SearchAsync(query, cancellationToken);
+        return new TableData<Tournament>
+        {
+            Items = items,
+            TotalItems = items.Count,
+        };
+    }
+
+    private async Task OnNameSearchChangedAsync(string value)
+    {
+        nameSearch = value;
+        if (table is not null)
+        {
+            await table.ReloadServerData();
+        }
+    }
+
+    private async Task OnWhenFilterChangedAsync(TournamentWhenFilter value)
+    {
+        whenFilter = value;
+        if (table is not null)
+        {
+            await table.ReloadServerData();
+        }
+    }
+
+    private static TournamentSortField MapSortField(string? sortLabel) =>
+        sortLabel switch
+        {
+            "Name" => TournamentSortField.Name,
+            "End" => TournamentSortField.EndDate,
+            _ => TournamentSortField.StartDate,
+        };
+
+    private TournamentLifecycleStatus GetLifecycleStatus(Tournament tournament) =>
+        TournamentSchedule.GetStatus(tournament, todayUtc);
+
+    private string GetStatusLabel(Tournament tournament) =>
+        GetLifecycleStatus(tournament) switch
+        {
+            TournamentLifecycleStatus.Upcoming => "Upcoming",
+            TournamentLifecycleStatus.InProgress => "In progress",
+            _ => "Past",
+        };
+
+    private Color GetStatusColor(Tournament tournament) =>
+        GetLifecycleStatus(tournament) switch
+        {
+            TournamentLifecycleStatus.Upcoming => Color.Info,
+            TournamentLifecycleStatus.InProgress => Color.Success,
+            _ => Color.Error,
+        };
+
+    private static string FormatDate(DateTimeOffset value) =>
+        value.UtcDateTime.ToString("d", CultureInfo.CurrentCulture);
+}

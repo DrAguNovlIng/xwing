@@ -1,0 +1,22 @@
+@inject IAntiforgery Antiforgery
+@inject IHttpContextAccessor HttpContextAccessor
+
+@if (!string.IsNullOrEmpty(requestToken))
+{
+    <input type="hidden" name="__RequestVerificationToken" value="@requestToken" />
+}
+
+@code {
+    private string? requestToken;
+
+    protected override void OnInitialized()
+    {
+        HttpContext? httpContext = HttpContextAccessor.HttpContext;
+        if (httpContext is null)
+        {
+            return;
+        }
+        AntiforgeryTokenSet tokens = Antiforgery.GetAndStoreTokens(httpContext);
+        requestToken = tokens.RequestToken;
+    }
+}

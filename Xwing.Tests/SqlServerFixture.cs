@@ -21,11 +21,9 @@ public sealed class SqlServerFixture : IAsyncLifetime
     {
         await container.StartAsync().ConfigureAwait(false);
         ConnectionString = container.GetConnectionString();
-
         var options = new DbContextOptionsBuilder<XwingDbContext>()
             .UseSqlServer(ConnectionString)
             .Options;
-
         await using XwingDbContext db = new(options, TimeProvider.System);
         await db.Database.MigrateAsync().ConfigureAwait(false);
     }

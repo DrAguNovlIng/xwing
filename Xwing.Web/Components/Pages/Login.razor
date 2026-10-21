@@ -1,0 +1,62 @@
+@page "/"
+@page "/login"
+@layout LoginLayout
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IUserStore UserStore
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+<PageTitle>Login</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Login</MudText>
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+<form method="post" action="/account/login">
+    <AntiforgeryFormField />
+    <input type="hidden" name="returnUrl" value="@returnUrl" />
+    <MudStack Spacing="3" Style="max-width: 24rem;">
+        <div>
+            <MudText Typo="Typo.body2">Username</MudText>
+            <input type="text" name="userName" required class="mud-input-slot mud-input-root mud-input-outlined" style="width: 100%;" />
+        </div>
+        <div>
+            <MudText Typo="Typo.body2">Password</MudText>
+            <input type="password" name="password" required class="mud-input-slot mud-input-root mud-input-outlined" style="width: 100%;" />
+        </div>
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Sign in</MudButton>
+    </MudStack>
+</form>
+
+@code {
+    private string? errorMessage;
+    private string returnUrl = "/tournaments";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await UserStore.AnyAdminExistsAsync(CancellationToken.None).ConfigureAwait(false))
+        {
+            NavigationManager.NavigateTo("/users", forceLoad: true);
+            return;
+        }
+        AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync().ConfigureAwait(false);
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            NavigationManager.NavigateTo("/tournaments");
+            return;
+        }
+        Uri uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("error", out Microsoft.Extensions.Primitives.StringValues errors))
+        {
+            errorMessage = errors.ToString();
+        }
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("returnUrl", out Microsoft.Extensions.Primitives.StringValues returnUrls))
+        {
+            string candidate = returnUrls.ToString();
+            if (!string.IsNullOrEmpty(candidate) && candidate.StartsWith('/'))
+            {
+                returnUrl = candidate;
+            }
+        }
+    }
+}

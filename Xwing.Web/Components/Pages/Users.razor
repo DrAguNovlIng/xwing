@@ -1,0 +1,190 @@
+@page "/users"
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Xwing.Web.Components.Dialogs
+@inject IUserStore UserStore
+
+@inject NavigationManager NavigationManager
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@inject IDialogService DialogService
+<PageTitle>Users</PageTitle>
+@if (!initialized)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (!anyAdmin)
+{
+    <MudText Typo="Typo.h4" Class="mb-2">Create the first admin</MudText>
+    <MudText Class="mb-4">No admin account exists yet. Choose a username and password.</MudText>
+    @if (!string.IsNullOrEmpty(bootstrapError))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@bootstrapError</MudAlert>
+    }
+    <form method="post" action="/account/first-admin">
+        <AntiforgeryFormField />
+        <MudStack Spacing="3" Style="max-width: 24rem;">
+            <div>
+                <MudText Typo="Typo.body2">Username</MudText>
+                <input type="text" name="userName" required class="mud-input-slot mud-input-root mud-input-outlined" style="width: 100%;" />
+            </div>
+            <div>
+                <MudText Typo="Typo.body2">Password</MudText>
+                <input type="password" name="password" required class="mud-input-slot mud-input-root mud-input-outlined" style="width: 100%;" />
+            </div>
+            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Create admin</MudButton>
+        </MudStack>
+    </form>
+}
+else if (isAdmin)
+{
+    <MudToolBar Gutters="false" Class="mb-4" WrapContent="true">
+        <MudText Typo="Typo.h4">Users</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenCreateDialogAsync">
+            Add user
+        </MudButton>
+    </MudToolBar>
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <MudAlert Severity="@statusSeverity" Class="mb-4" Dense="true">@statusMessage</MudAlert>
+    }
+    <MudTable Items="users" Hover="true" Dense="true">
+        <HeaderContent>
+            <MudTh>Username</MudTh>
+            <MudTh>Role</MudTh>
+            <MudTh Style="width: 12rem;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Username">@context.UserName</MudTd>
+            <MudTd DataLabel="Role">@context.Role</MudTd>
+            <MudTd>
+                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => OpenEditDialogAsync(context))">Edit</MudButton>
+                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error" OnClick="@(() => DeleteUserAsync(context.UserId))">Delete</MudButton>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private static readonly DialogOptions dialogOptions = new()
+    {
+        CloseButton = true,
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+    };
+
+    private bool initialized;
+
+    private bool anyAdmin;
+
+    private bool isAdmin;
+
+    private int? currentUserId;
+
+    private string? bootstrapError;
+
+    private string? statusMessage;
+
+    private Severity statusSeverity = Severity.Info;
+
+    private IReadOnlyList<UserAccount> users = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        anyAdmin = await UserStore.AnyAdminExistsAsync(CancellationToken.None);
+        if (anyAdmin)
+        {
+            AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            isAdmin = authState.User.IsInRole(UserRoles.Admin);
+            currentUserId = TryGetUserId(authState.User);
+            if (isAdmin)
+            {
+                await ReloadUsersAsync();
+            }
+            else
+            {
+                NavigationManager.NavigateTo("/login?returnUrl=/users", forceLoad: true);
+                return;
+            }
+        }
+        Uri uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("error", out Microsoft.Extensions.Primitives.StringValues errors))
+        {
+            bootstrapError = errors.ToString();
+        }
+        initialized = true;
+    }
+
+    private static int? TryGetUserId(ClaimsPrincipal user)
+    {
+        string? idValue = user.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (int.TryParse(idValue, out int userId))
+        {
+            return userId;
+        }
+        return null;
+    }
+
+    private async Task ReloadUsersAsync()
+    {
+        users = await UserStore.ListAsync(CancellationToken.None);
+    }
+
+    private async Task OpenCreateDialogAsync()
+    {
+        IDialogReference dialog = await DialogService.ShowAsync<UserFormDialog>(
+            "Add user",
+            dialogOptions);
+        DialogResult? result = await dialog.Result;
+        if (result is null || result.Canceled)
+        {
+            return;
+        }
+        ShowStatus("User created.", Severity.Success);
+        await ReloadUsersAsync();
+    }
+
+    private async Task OpenEditDialogAsync(UserAccount user)
+    {
+        var parameters = new DialogParameters<UserFormDialog>
+        {
+            { x => x.User, user },
+            { x => x.CurrentUserId, currentUserId },
+        };
+        IDialogReference dialog = await DialogService.ShowAsync<UserFormDialog>(
+            "Edit user",
+            parameters,
+            dialogOptions);
+        DialogResult? result = await dialog.Result;
+        if (result is null || result.Canceled)
+        {
+            return;
+        }
+        ShowStatus("User updated.", Severity.Success);
+        await ReloadUsersAsync();
+    }
+
+    private async Task DeleteUserAsync(int userId)
+    {
+        Result result = await UserStore.DeleteAsync(userId, CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error!, Severity.Error);
+            return;
+        }
+        ShowStatus("User deleted.", Severity.Success);
+        await ReloadUsersAsync();
+    }
+
+    private void ShowStatus(string message, Severity severity)
+    {
+        statusMessage = message;
+        statusSeverity = severity;
+    }
+}

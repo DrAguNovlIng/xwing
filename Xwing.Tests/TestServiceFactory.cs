@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xwing.Web.Data;
 using Xwing.Web.Stores;
 
@@ -9,8 +11,12 @@ internal static class TestServiceFactory
     public static TestStores CreateStores(string connectionString, TimeProvider? timeProvider = null)
     {
         TimeProvider clock = timeProvider ?? TimeProvider.System;
-        XwingDbContext context = CreateContext(connectionString, clock);
-        return new TestStores(context, new TournamentStore(context));
+        var contextFactory = new TestDbContextFactory(connectionString, clock);
+        var concurrencyHelpers = new StoreConcurrencyHelpers(NullLogger<StoreConcurrencyHelpers>.Instance);
+        var passwordHasher = new PasswordHasher<User>();
+        return new TestStores(
+            new TournamentStore(contextFactory, concurrencyHelpers, clock),
+            new UserStore(contextFactory, concurrencyHelpers, passwordHasher));
     }
 
     public static async Task<TestStores> CreateStoresWithResetAsync(
@@ -24,16 +30,9 @@ internal static class TestServiceFactory
 
     private static async Task ResetMutableDataAsync(string connectionString, CancellationToken cancellationToken)
     {
-        await using XwingDbContext db = CreateContext(connectionString, TimeProvider.System);
+        var factory = new TestDbContextFactory(connectionString, TimeProvider.System);
+        await using XwingDbContext db = await factory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         await db.Tournaments.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
-    }
-
-    private static XwingDbContext CreateContext(string connectionString, TimeProvider timeProvider)
-    {
-        var options = new DbContextOptionsBuilder<XwingDbContext>()
-            .UseSqlServer(connectionString)
-            .Options;
-
-        return new XwingDbContext(options, timeProvider);
+        await db.Users.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
     }
 }
