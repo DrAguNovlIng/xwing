@@ -50,7 +50,7 @@
             TournamentId,
             UserId,
             squadJson,
-            CancellationToken.None).ConfigureAwait(false);
+            CancellationToken.None);
         if (!result.IsSuccess)
         {
             errorMessage = result.Error;
