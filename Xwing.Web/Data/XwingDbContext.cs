@@ -17,6 +17,8 @@ public sealed class XwingDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
 
+    public DbSet<TournamentParticipant> TournamentParticipants => Set<TournamentParticipant>();
+
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         StampTimes();
@@ -56,6 +58,23 @@ public sealed class XwingDbContext : DbContext
             entity.Property(e => e.Role).HasMaxLength(50).IsRequired();
             entity.Property(e => e.TimeCreatedUtc).HasColumnType("datetimeoffset");
             entity.Property(e => e.TimeUpdatedUtc).HasColumnType("datetimeoffset");
+        });
+        modelBuilder.Entity<TournamentParticipant>(entity =>
+        {
+            entity.ToTable("TournamentParticipants");
+            entity.HasKey(e => e.TournamentParticipantId);
+            entity.Property(e => e.TournamentParticipantId).UseIdentityColumn();
+            entity.HasIndex(e => new { e.TournamentId, e.UserId }).IsUnique();
+            entity.Property(e => e.TimeCreatedUtc).HasColumnType("datetimeoffset");
+            entity.Property(e => e.TimeUpdatedUtc).HasColumnType("datetimeoffset");
+            entity.HasOne(e => e.Tournament)
+                .WithMany()
+                .HasForeignKey(e => e.TournamentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
         foreach (Type clrType in modelBuilder.Model.GetEntityTypes().Select(entityType => entityType.ClrType))
         {

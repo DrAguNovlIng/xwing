@@ -32,6 +32,7 @@ internal static class TestServiceFactory
     {
         var factory = new TestDbContextFactory(connectionString, TimeProvider.System);
         await using XwingDbContext db = await factory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        await db.TournamentParticipants.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
         await db.Tournaments.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
         await db.Users.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
     }

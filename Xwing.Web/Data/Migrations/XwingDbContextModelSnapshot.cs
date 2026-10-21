@@ -58,6 +58,42 @@ namespace Xwing.Web.Data.Migrations
                     b.ToTable("Tournaments", (string)null);
                 });
 
+            modelBuilder.Entity("Xwing.Web.Data.TournamentParticipant", b =>
+                {
+                    b.Property<int>("TournamentParticipantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TournamentParticipantId"));
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTimeOffset>("TimeCreatedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("TimeUpdatedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("TournamentId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("TournamentParticipantId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("TournamentId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("TournamentParticipants", (string)null);
+                });
+
             modelBuilder.Entity("Xwing.Web.Data.User", b =>
                 {
                     b.Property<int>("UserId")
@@ -99,6 +135,25 @@ namespace Xwing.Web.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Users", (string)null);
+                });
+
+            modelBuilder.Entity("Xwing.Web.Data.TournamentParticipant", b =>
+                {
+                    b.HasOne("Xwing.Web.Data.Tournament", "Tournament")
+                        .WithMany()
+                        .HasForeignKey("TournamentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Xwing.Web.Data.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tournament");
+
+                    b.Navigation("User");
                 });
 #pragma warning restore 612, 618
         }
