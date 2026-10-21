@@ -53,13 +53,20 @@ else
     {
         @if (currentUserJoined)
         {
-            <MudButton Variant="Variant.Outlined"
-                       Color="Color.Primary"
-                       Class="mb-4"
-                       Disabled="actionInProgress"
-                       OnClick="ConfirmLeaveAsync">
-                Leave tournament
-            </MudButton>
+            <MudStack Row="true" Spacing="2" Class="mb-4" Wrap="Wrap.Wrap">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           Disabled="actionInProgress"
+                           OnClick="OpenSquadDialogAsync">
+                    @(CurrentUserHasSquad ? "Change squad" : "Add squad")
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           Disabled="actionInProgress"
+                           OnClick="ConfirmLeaveAsync">
+                    Leave tournament
+                </MudButton>
+            </MudStack>
         }
         else
         {
@@ -83,12 +90,25 @@ else
     }
     else
     {
-        <MudList T="string" Dense="true">
+        <MudStack Spacing="2">
             @foreach (TournamentMember member in members)
             {
-                <MudListItem T="string">@member.UserName</MudListItem>
+                <MudPaper Class="pa-3" Elevation="0" Outlined="true">
+                    <MudText Typo="Typo.subtitle1">@member.UserName</MudText>
+                    @if (!string.IsNullOrEmpty(member.SquadFactionDisplay))
+                    {
+                        <MudText Typo="Typo.body2" Class="mt-1">@member.SquadFactionDisplay</MudText>
+                        <MudText Typo="Typo.body2">@FormatShipList(member.SquadShipLabels)</MudText>
+                        @if (!string.IsNullOrEmpty(member.SquadUrl))
+                        {
+                            <MudLink Href="@member.SquadUrl" Target="_blank" Class="mt-1 d-inline-block">
+                                View build
+                            </MudLink>
+                        }
+                    }
+                </MudPaper>
             }
-        </MudList>
+        </MudStack>
     }
 }
 
@@ -219,6 +239,34 @@ else
         }
     }
 
+    private bool CurrentUserHasSquad =>
+        currentUserId is int uid &&
+        members.Any(m => m.UserId == uid && !string.IsNullOrEmpty(m.SquadUrl));
+
+    private async Task OpenSquadDialogAsync()
+    {
+        if (currentUserId is not int userId)
+        {
+            return;
+        }
+        var parameters = new DialogParameters<TournamentSquadDialog>
+        {
+            { x => x.TournamentId, TournamentId },
+            { x => x.UserId, userId },
+            { x => x.HasExistingSquad, CurrentUserHasSquad },
+        };
+        IDialogReference dialog = await DialogService.ShowAsync<TournamentSquadDialog>(
+            string.Empty,
+            parameters,
+            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true }).ConfigureAwait(false);
+        DialogResult? result = await dialog.Result.ConfigureAwait(false);
+        if (result is not null && !result.Canceled)
+        {
+            await ReloadMembersAsync().ConfigureAwait(false);
+            ShowStatus("Squad saved.", Severity.Success);
+        }
+    }
+
     private async Task ConfirmLeaveAsync()
     {
         IDialogReference dialog = await DialogService.ShowAsync<LeaveTournamentConfirmDialog>(
@@ -296,6 +344,9 @@ else
 
     private static string FormatDate(DateTimeOffset value) =>
         value.UtcDateTime.ToString("d", CultureInfo.CurrentCulture);
+
+    private static string FormatShipList(IReadOnlyList<string> ships) =>
+        ships.Count == 0 ? string.Empty : string.Join(", ", ships);
 
     private void ShowStatus(string message, Severity severity)
     {

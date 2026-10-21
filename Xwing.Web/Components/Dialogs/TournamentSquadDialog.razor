@@ -1,0 +1,61 @@
+@inject ITournamentStore TournamentStore
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(HasExistingSquad ? "Change squad" : "Add squad")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            Paste the XWS JSON exported from your XWA squad builder (YASB, Launch Bay Next, and similar).
+        </MudText>
+        <MudTextField @bind-Value="squadJson"
+                      Label="Squad JSON"
+                      Variant="Variant.Outlined"
+                      Lines="8"
+                      Sizing="InputSizing.Auto" />
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@errorMessage</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public int TournamentId { get; set; }
+
+    [Parameter]
+    public int UserId { get; set; }
+
+    [Parameter]
+    public bool HasExistingSquad { get; set; }
+
+    private string squadJson = string.Empty;
+
+    private string? errorMessage;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SaveAsync()
+    {
+        errorMessage = null;
+        Result result = await TournamentStore.SetSquadAsync(
+            TournamentId,
+            UserId,
+            squadJson,
+            CancellationToken.None).ConfigureAwait(false);
+        if (!result.IsSuccess)
+        {
+            errorMessage = result.Error;
+            return;
+        }
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

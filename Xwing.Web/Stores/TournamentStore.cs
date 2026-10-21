@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Xwing.Web.Data;
 using Xwing.Web.Models;
@@ -149,17 +151,86 @@ public sealed class TournamentStore : ITournamentStore
         CancellationToken cancellationToken)
     {
         await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-        return await context.TournamentParticipants
+        List<TournamentParticipant> participants = await context.TournamentParticipants
             .AsNoTracking()
+            .Include(p => p.User)
             .Where(p => p.TournamentId == tournamentId)
             .OrderBy(p => p.User.UserName)
-            .Select(p => new TournamentMember
-            {
-                UserId = p.UserId,
-                UserName = p.User.UserName,
-            })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+        return participants.Select(MapMember).ToList();
+    }
+
+    public async Task<Result> SetSquadAsync(
+        int tournamentId,
+        int userId,
+        string squadJson,
+        CancellationToken cancellationToken)
+    {
+        Result<XwaSquad> parsed = XwaSquad.Parse(squadJson);
+        if (!parsed.IsSuccess)
+        {
+            return Result.Fail(parsed.Error!);
+        }
+        await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        Tournament? tournament = await context.Tournaments
+            .AsNoTracking()
+            .SingleOrDefaultAsync(t => t.TournamentId == tournamentId, cancellationToken)
+            .ConfigureAwait(false);
+        if (tournament is null)
+        {
+            return Result.Fail("Tournament not found.");
+        }
+        Result? rosterWindow = ValidateRosterOpen(tournament);
+        if (rosterWindow is not null)
+        {
+            return rosterWindow;
+        }
+        TournamentParticipant? participant = await context.TournamentParticipants
+            .SingleOrDefaultAsync(
+                p => p.TournamentId == tournamentId && p.UserId == userId,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (participant is null)
+        {
+            return Result.Fail("You are not in this tournament.");
+        }
+        XwaSquad squad = parsed.Value!;
+        participant.SquadFaction = squad.FactionDisplayName;
+        participant.SquadShipsJson = JsonSerializer.Serialize(squad.ShipIds);
+        participant.SquadUrl = squad.Url;
+        return await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static TournamentMember MapMember(TournamentParticipant participant)
+    {
+        List<string> shipLabels = [];
+        if (!string.IsNullOrEmpty(participant.SquadShipsJson))
+        {
+            try
+            {
+                string[]? shipIds = JsonSerializer.Deserialize<string[]>(participant.SquadShipsJson);
+                if (shipIds is not null)
+                {
+                    shipLabels = shipIds.Select(XwaSquad.FormatShipDisplayName).ToList();
+                }
+            }
+            catch (JsonException)
+            {
+                shipLabels = [];
+            }
+        }
+        bool hasSquad = !string.IsNullOrEmpty(participant.SquadFaction) &&
+                        shipLabels.Count > 0 &&
+                        !string.IsNullOrEmpty(participant.SquadUrl);
+        return new TournamentMember
+        {
+            UserId = participant.UserId,
+            UserName = participant.User.UserName,
+            SquadFactionDisplay = hasSquad ? participant.SquadFaction : null,
+            SquadShipLabels = hasSquad ? shipLabels : [],
+            SquadUrl = hasSquad ? participant.SquadUrl : null,
+        };
     }
 
     public async Task<Result> JoinAsync(int tournamentId, int userId, CancellationToken cancellationToken)
@@ -312,4 +383,9 @@ public sealed record TournamentMember
 {
     public int UserId { get; init; }
     public string UserName { get; init; } = string.Empty;
+    public string? SquadFactionDisplay { get; init; }
+    public IReadOnlyList<string> SquadShipLabels { get; init; } = [];
+
+    [SuppressMessage("Design", "CA1056:URI-like properties should not be strings", Justification = "Blazor href binding uses string URLs.")]
+    public string? SquadUrl { get; init; }
 }

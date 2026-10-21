@@ -26,4 +26,5 @@ public interface ITournamentStore
     Task<IReadOnlyList<TournamentMember>> ListMembersAsync(int tournamentId, CancellationToken cancellationToken);
     Task<Result> JoinAsync(int tournamentId, int userId, CancellationToken cancellationToken);
     Task<Result> LeaveAsync(int tournamentId, int userId, CancellationToken cancellationToken);
+    Task<Result> SetSquadAsync(int tournamentId, int userId, string squadJson, CancellationToken cancellationToken);
 }
