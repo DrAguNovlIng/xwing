@@ -97,7 +97,25 @@ else
                     <MudText Typo="Typo.subtitle1">@member.UserName</MudText>
                     @if (!string.IsNullOrEmpty(member.SquadFactionDisplay))
                     {
-                        <MudText Typo="Typo.body2" Class="mt-1">@member.SquadFactionDisplay</MudText>
+                        <div class="squad-faction-row">
+                            @if (GetFactionIconSlug(member.SquadFactionDisplay) is string factionSlug)
+                            {
+                                <i class="@($"xwing-miniatures-font xwing-miniatures-font-{factionSlug}")"
+                                   aria-hidden="true"></i>
+                            }
+                            <MudText Typo="Typo.body2">@member.SquadFactionDisplay</MudText>
+                        </div>
+                        <div class="squad-ship-icons">
+                            @for (int shipIndex = 0; shipIndex < member.SquadShipIds.Count; shipIndex++)
+                            {
+                                string shipLabel = member.SquadShipLabels[shipIndex];
+                                string shipSlug = GetShipIconSlug(member.SquadShipIds[shipIndex]);
+                                <span aria-label="@shipLabel">
+                                    <i class="@($"xwing-miniatures-ship xwing-miniatures-ship-{shipSlug}")"
+                                       aria-hidden="true"></i>
+                                </span>
+                            }
+                        </div>
                         <MudText Typo="Typo.body2">@FormatShipList(member.SquadShipLabels)</MudText>
                         @if (!string.IsNullOrEmpty(member.SquadUrl))
                         {
@@ -347,6 +365,12 @@ else
 
     private static string FormatShipList(IReadOnlyList<string> ships) =>
         ships.Count == 0 ? string.Empty : string.Join(", ", ships);
+
+    private static string? GetFactionIconSlug(string factionDisplayName) =>
+        XwaSquad.GetFactionIconSlug(factionDisplayName);
+
+    private static string GetShipIconSlug(string shipId) =>
+        XwaSquad.GetShipIconSlug(shipId);
 
     private void ShowStatus(string message, Severity severity)
     {

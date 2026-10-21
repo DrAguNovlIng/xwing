@@ -142,6 +142,31 @@ public sealed record XwaSquad
         };
     }
 
+    public static string? GetFactionIconSlug(string factionDisplayName)
+    {
+        if (string.IsNullOrWhiteSpace(factionDisplayName))
+        {
+            return null;
+        }
+        return factionDisplayName.Trim() switch
+        {
+            "Rebel Alliance" => "rebel",
+            "Galactic Empire" => "empire",
+            "Scum and Villainy" => "scum",
+            "Resistance" => "rebel-outline",
+            "Separatist Alliance" => "separatists",
+            "First Order" => "firstorder",
+            "Galactic Republic" => "republic",
+            _ => null,
+        };
+    }
+
+    public static string GetShipIconSlug(string shipId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(shipId);
+        return shipId.Replace("-", string.Empty, StringComparison.Ordinal);
+    }
+
     private static string? FindVendorUrl(JsonElement element)
     {
         if (element.ValueKind == JsonValueKind.Object)

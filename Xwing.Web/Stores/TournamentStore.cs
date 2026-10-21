@@ -204,19 +204,22 @@ public sealed class TournamentStore : ITournamentStore
 
     private static TournamentMember MapMember(TournamentParticipant participant)
     {
+        List<string> shipIds = [];
         List<string> shipLabels = [];
         if (!string.IsNullOrEmpty(participant.SquadShipsJson))
         {
             try
             {
-                string[]? shipIds = JsonSerializer.Deserialize<string[]>(participant.SquadShipsJson);
-                if (shipIds is not null)
+                string[]? parsedShipIds = JsonSerializer.Deserialize<string[]>(participant.SquadShipsJson);
+                if (parsedShipIds is not null)
                 {
+                    shipIds = parsedShipIds.ToList();
                     shipLabels = shipIds.Select(XwaSquad.FormatShipDisplayName).ToList();
                 }
             }
             catch (JsonException)
             {
+                shipIds = [];
                 shipLabels = [];
             }
         }
@@ -228,6 +231,7 @@ public sealed class TournamentStore : ITournamentStore
             UserId = participant.UserId,
             UserName = participant.User.UserName,
             SquadFactionDisplay = hasSquad ? participant.SquadFaction : null,
+            SquadShipIds = hasSquad ? shipIds : [],
             SquadShipLabels = hasSquad ? shipLabels : [],
             SquadUrl = hasSquad ? participant.SquadUrl : null,
         };
@@ -384,6 +388,7 @@ public sealed record TournamentMember
     public int UserId { get; init; }
     public string UserName { get; init; } = string.Empty;
     public string? SquadFactionDisplay { get; init; }
+    public IReadOnlyList<string> SquadShipIds { get; init; } = [];
     public IReadOnlyList<string> SquadShipLabels { get; init; } = [];
 
     [SuppressMessage("Design", "CA1056:URI-like properties should not be strings", Justification = "Blazor href binding uses string URLs.")]

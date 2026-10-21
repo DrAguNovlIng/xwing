@@ -99,4 +99,18 @@ public sealed class XwaSquadTests
         result.IsSuccess.ShouldBeFalse();
         result.Error.ShouldBe("Squad must include a build link in vendor metadata.");
     }
+
+    [Fact]
+    public void GetShipIconSlugShouldRemoveHyphens()
+    {
+        XwaSquad.GetShipIconSlug("t-65-x-wing").ShouldBe("t65xwing");
+    }
+
+    [Fact]
+    public void GetFactionIconSlugShouldMapKnownFactions()
+    {
+        XwaSquad.GetFactionIconSlug("Rebel Alliance").ShouldBe("rebel");
+        XwaSquad.GetFactionIconSlug("Resistance").ShouldBe("rebel-outline");
+        XwaSquad.GetFactionIconSlug("Unknown Faction").ShouldBeNull();
+    }
 }
