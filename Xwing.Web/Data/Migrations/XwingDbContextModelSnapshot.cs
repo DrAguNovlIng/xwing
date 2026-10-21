@@ -22,6 +22,97 @@ namespace Xwing.Web.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Xwing.Web.Data.TemplateMatch", b =>
+                {
+                    b.Property<int>("TemplateMatchId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TemplateMatchId"));
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("PositionX")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PositionY")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SlotAOpenLabel")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("SlotBOpenLabel")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset>("TimeCreatedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("TimeUpdatedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("TournamentTemplateId")
+                        .HasColumnType("int");
+
+                    b.HasKey("TemplateMatchId");
+
+                    b.HasIndex("TournamentTemplateId");
+
+                    b.ToTable("TemplateMatches", (string)null);
+                });
+
+            modelBuilder.Entity("Xwing.Web.Data.TemplateMatchFeed", b =>
+                {
+                    b.Property<int>("TemplateMatchFeedId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TemplateMatchFeedId"));
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("SourceOutcome")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SourceTemplateMatchId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TargetSlot")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TargetTemplateMatchId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("TimeCreatedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("TimeUpdatedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("TemplateMatchFeedId");
+
+                    b.HasIndex("SourceTemplateMatchId", "SourceOutcome")
+                        .IsUnique();
+
+                    b.HasIndex("TargetTemplateMatchId", "TargetSlot")
+                        .IsUnique();
+
+                    b.ToTable("TemplateMatchFeeds", (string)null);
+                });
+
             modelBuilder.Entity("Xwing.Web.Data.Tournament", b =>
                 {
                     b.Property<int>("TournamentId")
@@ -56,6 +147,36 @@ namespace Xwing.Web.Data.Migrations
                     b.HasKey("TournamentId");
 
                     b.ToTable("Tournaments", (string)null);
+                });
+
+            modelBuilder.Entity("Xwing.Web.Data.TournamentTemplate", b =>
+                {
+                    b.Property<int>("TournamentTemplateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TournamentTemplateId"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTimeOffset>("TimeCreatedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("TimeUpdatedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("TournamentTemplateId");
+
+                    b.ToTable("TournamentTemplates", (string)null);
                 });
 
             modelBuilder.Entity("Xwing.Web.Data.User", b =>
@@ -99,6 +220,48 @@ namespace Xwing.Web.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Users", (string)null);
+                });
+
+            modelBuilder.Entity("Xwing.Web.Data.TemplateMatch", b =>
+                {
+                    b.HasOne("Xwing.Web.Data.TournamentTemplate", "TournamentTemplate")
+                        .WithMany("Matches")
+                        .HasForeignKey("TournamentTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TournamentTemplate");
+                });
+
+            modelBuilder.Entity("Xwing.Web.Data.TemplateMatchFeed", b =>
+                {
+                    b.HasOne("Xwing.Web.Data.TemplateMatch", "SourceMatch")
+                        .WithMany("OutgoingFeeds")
+                        .HasForeignKey("SourceTemplateMatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Xwing.Web.Data.TemplateMatch", "TargetMatch")
+                        .WithMany("IncomingFeeds")
+                        .HasForeignKey("TargetTemplateMatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SourceMatch");
+
+                    b.Navigation("TargetMatch");
+                });
+
+            modelBuilder.Entity("Xwing.Web.Data.TemplateMatch", b =>
+                {
+                    b.Navigation("IncomingFeeds");
+
+                    b.Navigation("OutgoingFeeds");
+                });
+
+            modelBuilder.Entity("Xwing.Web.Data.TournamentTemplate", b =>
+                {
+                    b.Navigation("Matches");
                 });
 #pragma warning restore 612, 618
         }
