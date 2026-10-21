@@ -5,11 +5,15 @@
 @using System.Globalization
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
+@using Xwing.Web.Components.Dialogs
 @using Xwing.Web.Data
 @inject ITournamentStore TournamentStore
 
 @inject TimeProvider TimeProvider
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IDialogService DialogService
+
+@implements IDisposable
 
 <PageTitle>@(tournament?.Name ?? "Tournament")</PageTitle>
 
@@ -41,6 +45,10 @@ else
         <MudText Typo="Typo.body2">Start: @FormatDate(tournament.StartDateUtc)</MudText>
         <MudText Typo="Typo.body2">End: @FormatDate(tournament.EndDateUtc)</MudText>
     </MudStack>
+    @if (!string.IsNullOrEmpty(joinTimeLeftLabel))
+    {
+        <MudText Typo="Typo.body2" Class="mb-4">@joinTimeLeftLabel</MudText>
+    }
     @if (rosterOpen)
     {
         @if (currentUserJoined)
@@ -49,7 +57,7 @@ else
                        Color="Color.Primary"
                        Class="mb-4"
                        Disabled="actionInProgress"
-                       OnClick="LeaveAsync">
+                       OnClick="ConfirmLeaveAsync">
                 Leave tournament
             </MudButton>
         }
@@ -108,8 +116,15 @@ else
 
     private bool currentUserJoined;
 
+    private string? joinTimeLeftLabel;
+
+    private PeriodicTimer? countdownTimer;
+
+    private CancellationTokenSource? countdownCts;
+
     protected override async Task OnParametersSetAsync()
     {
+        await StopCountdownAsync().ConfigureAwait(false);
         loading = true;
         statusMessage = null;
         todayUtc = TournamentSchedule.TodayUtc(TimeProvider);
@@ -120,10 +135,100 @@ else
         if (tournament is not null)
         {
             members = await TournamentStore.ListMembersAsync(TournamentId, CancellationToken.None).ConfigureAwait(false);
-            rosterOpen = TournamentSchedule.GetStatus(tournament, todayUtc) == TournamentLifecycleStatus.Upcoming;
+            RefreshRosterState();
             currentUserJoined = currentUserId is int uid && members.Any(m => m.UserId == uid);
         }
+        else
+        {
+            joinTimeLeftLabel = null;
+            rosterOpen = false;
+        }
         loading = false;
+        if (tournament is not null && TournamentSchedule.TimeLeftToJoinUsesMinuteRefresh(tournament, TimeProvider.GetUtcNow()))
+        {
+            StartCountdownTimer();
+        }
+    }
+
+    public void Dispose()
+    {
+        countdownCts?.Cancel();
+        countdownCts?.Dispose();
+        countdownTimer?.Dispose();
+    }
+
+    private void RefreshRosterState()
+    {
+        if (tournament is null)
+        {
+            rosterOpen = false;
+            joinTimeLeftLabel = null;
+            return;
+        }
+        todayUtc = TournamentSchedule.TodayUtc(TimeProvider);
+        rosterOpen = TournamentSchedule.GetStatus(tournament, todayUtc) == TournamentLifecycleStatus.Upcoming;
+        joinTimeLeftLabel = rosterOpen
+            ? TournamentSchedule.FormatTimeLeftToJoin(tournament, TimeProvider.GetUtcNow())
+            : null;
+        if (joinTimeLeftLabel is null)
+        {
+            rosterOpen = false;
+        }
+    }
+
+    private void StartCountdownTimer()
+    {
+        countdownCts = new CancellationTokenSource();
+        countdownTimer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+        _ = RunCountdownLoopAsync(countdownCts.Token);
+    }
+
+    private async Task StopCountdownAsync()
+    {
+        if (countdownCts is not null)
+        {
+            await countdownCts.CancelAsync().ConfigureAwait(false);
+            countdownCts.Dispose();
+            countdownCts = null;
+        }
+        countdownTimer?.Dispose();
+        countdownTimer = null;
+    }
+
+    private async Task RunCountdownLoopAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (countdownTimer is not null && await countdownTimer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            {
+                await InvokeAsync(() =>
+                {
+                    RefreshRosterState();
+                    StateHasChanged();
+                }).ConfigureAwait(false);
+                if (!rosterOpen || tournament is null ||
+                    !TournamentSchedule.TimeLeftToJoinUsesMinuteRefresh(tournament, TimeProvider.GetUtcNow()))
+                {
+                    await StopCountdownAsync().ConfigureAwait(false);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Countdown stopped when the page is disposed or the roster closes.
+        }
+    }
+
+    private async Task ConfirmLeaveAsync()
+    {
+        IDialogReference dialog = await DialogService.ShowAsync<LeaveTournamentConfirmDialog>(
+            string.Empty,
+            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true }).ConfigureAwait(false);
+        DialogResult? result = await dialog.Result.ConfigureAwait(false);
+        if (result is not null && !result.Canceled && result.Data is true)
+        {
+            await LeaveAsync().ConfigureAwait(false);
+        }
     }
 
     private async Task JoinAsync()

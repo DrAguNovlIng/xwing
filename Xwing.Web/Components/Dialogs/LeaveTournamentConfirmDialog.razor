@@ -1,0 +1,23 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Leave this tournament?</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText>
+            You will be removed from the participant list. You can join again only while the roster is still open.
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Stay</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Confirm">Leave</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Confirm() => MudDialog.Close(DialogResult.Ok(true));
+}
