@@ -8,5 +8,6 @@
   </Folder>
   <Project Path="Xwing.AppHost/Xwing.AppHost.csproj" />
   <Project Path="Xwing.ServiceDefaults/Xwing.ServiceDefaults.csproj" />
+  <Project Path="Xwing.Tests/Xwing.Tests.csproj" />
   <Project Path="Xwing.Web/Xwing.Web.csproj" />
 </Solution>

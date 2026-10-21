@@ -218,7 +218,7 @@ dotnet_diagnostic.CA1863.severity = none
 # Defaults from the template, keep a few empty lines above this
 
 #CA1062: Migration Warning
-[*/Migrations/*.cs]
+[**/Migrations/*.cs]
 dotnet_diagnostic.CA1062.severity = none
 
 [src/libraries/System.Net.Http/src/System/Net/Http/{SocketsHttpHandler/Http3RequestStream.cs,BrowserHttpHandler/BrowserHttpHandler.cs}]

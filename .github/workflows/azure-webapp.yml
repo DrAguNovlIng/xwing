@@ -30,7 +30,10 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore
-        run: dotnet restore Xwing.Web/Xwing.Web.csproj
+        run: dotnet restore
+
+      - name: Test
+        run: dotnet test --no-restore
 
       - name: Publish
         run: dotnet publish Xwing.Web/Xwing.Web.csproj -c Release -o "${{ runner.temp }}/publish"

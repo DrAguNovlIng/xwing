@@ -9,6 +9,7 @@ Target framework: **net10.0** (see [Directory.Build.props](Directory.Build.props
 - **Xwing.AppHost** — Aspire orchestration (local dev only)
 - **Xwing.ServiceDefaults** — OpenTelemetry, health checks, service discovery
 - **Xwing.Web** — Blazor UI (this is what production deploys)
+- **Xwing.Tests** — Store integration tests (SQL Server via Testcontainers; requires Docker)
 
 ## Run locally
 
@@ -16,17 +17,25 @@ Target framework: **net10.0** (see [Directory.Build.props](Directory.Build.props
 dotnet run --project Xwing.AppHost
 ```
 
-Or run the web app alone:
+Or run the web app alone (requires a SQL connection string; see Azure SQL below):
 
 ```bash
 dotnet run --project Xwing.Web
 ```
 
+Store tests:
+
+```bash
+dotnet test
+```
+
+Docker must be running for `Xwing.Tests` (Testcontainers starts SQL Server 2022).
+
 ## Azure deployment (App Service)
 
 Production hosts **Xwing.Web** on a **Linux App Service** (.NET 10). GitHub Actions builds with `dotnet publish` and deploys via OpenID Connect (no publish profile). Workflow: [`.github/workflows/azure-webapp.yml`](.github/workflows/azure-webapp.yml).
 
-- **Pull requests** to `main`: build only.
+- **Pull requests** to `main`: restore, test, and build (no deploy).
 - **Push** to `main` or **workflow_dispatch**: build and deploy.
 
 After the new site works, delete the old **Azure Static Web App** and the GitHub secret `AZURE_STATIC_WEB_APPS_API_TOKEN_NICE_ISLAND_0493C9B03` if it is still present.
@@ -46,6 +55,26 @@ After the new site works, delete the old **Azure Static Web App** and the GitHub
    - **Web sockets (Windows)**: If you use Windows instead of Linux, set **Web sockets** to **On** under Platform settings.
    - **Free (F1) Linux**: WebSockets are supported, but Azure limits you to about **five concurrent WebSocket connections**; extra connections may receive HTTP 429. Basic B1+ is better for several users at once.
 5. Note the **web app name** (used as `AZURE_WEBAPP_NAME`, not the full URL).
+
+### Azure SQL (tournaments database)
+
+Production data lives in **Azure SQL Database**. Local development uses the SQL Server container started by **Xwing.AppHost** (connection name `xwing`).
+
+1. In the same resource group as the web app, create a **SQL server** (logical server) and a database named **`xwing`** (or another name if you update the connection name in code).
+2. Configure **SQL authentication** (server admin login and password) or use Entra ID if you prefer that model later.
+3. On the SQL server **Networking** blade, allow **Azure services** (and your client IP while testing from SSMS or Azure Data Studio).
+4. Build an ADO.NET connection string for the database (`Encrypt=True`, `TrustServerCertificate=False` for Azure SQL).
+5. On the **Web App**, open **Configuration** → **Application settings** and add:
+
+   | Name | Value |
+   |------|--------|
+   | `ConnectionStrings__xwing` | Your Azure SQL connection string |
+
+   Do not commit connection strings. [.gitignore](.gitignore) ignores local `appsettings*.json`.
+
+6. Deploy or restart the web app. On startup, **Xwing.Web** applies EF Core migrations and creates the **`Tournaments`** table if it is missing (columns include `TournamentId`, `Name`, audit timestamps, and `RowVersion`).
+
+Pull requests and pushes run `dotnet test` in GitHub Actions (Docker is available on `ubuntu-latest` runners).
 
 ### 2. Entra app registration for GitHub Actions
 
