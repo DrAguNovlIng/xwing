@@ -17,6 +17,12 @@ public sealed class XwingDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
 
+    public DbSet<TournamentTemplate> TournamentTemplates => Set<TournamentTemplate>();
+
+    public DbSet<TemplateMatch> TemplateMatches => Set<TemplateMatch>();
+
+    public DbSet<TemplateMatchFeed> TemplateMatchFeeds => Set<TemplateMatchFeed>();
+
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         StampTimes();
@@ -57,6 +63,54 @@ public sealed class XwingDbContext : DbContext
             entity.Property(e => e.TimeCreatedUtc).HasColumnType("datetimeoffset");
             entity.Property(e => e.TimeUpdatedUtc).HasColumnType("datetimeoffset");
         });
+
+        modelBuilder.Entity<TournamentTemplate>(entity =>
+        {
+            entity.ToTable("TournamentTemplates");
+            entity.HasKey(e => e.TournamentTemplateId);
+            entity.Property(e => e.TournamentTemplateId).UseIdentityColumn();
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.TimeCreatedUtc).HasColumnType("datetimeoffset");
+            entity.Property(e => e.TimeUpdatedUtc).HasColumnType("datetimeoffset");
+        });
+
+        modelBuilder.Entity<TemplateMatch>(entity =>
+        {
+            entity.ToTable("TemplateMatches");
+            entity.HasKey(e => e.TemplateMatchId);
+            entity.Property(e => e.TemplateMatchId).UseIdentityColumn();
+            entity.Property(e => e.Name).HasMaxLength(200);
+            entity.Property(e => e.SlotAOpenLabel).HasMaxLength(200);
+            entity.Property(e => e.SlotBOpenLabel).HasMaxLength(200);
+            entity.Property(e => e.TimeCreatedUtc).HasColumnType("datetimeoffset");
+            entity.Property(e => e.TimeUpdatedUtc).HasColumnType("datetimeoffset");
+            entity.HasOne(e => e.TournamentTemplate)
+                .WithMany(t => t.Matches)
+                .HasForeignKey(e => e.TournamentTemplateId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TemplateMatchFeed>(entity =>
+        {
+            entity.ToTable("TemplateMatchFeeds");
+            entity.HasKey(e => e.TemplateMatchFeedId);
+            entity.Property(e => e.TemplateMatchFeedId).UseIdentityColumn();
+            entity.Property(e => e.TargetSlot).HasConversion<int>();
+            entity.Property(e => e.SourceOutcome).HasConversion<int>();
+            entity.Property(e => e.TimeCreatedUtc).HasColumnType("datetimeoffset");
+            entity.Property(e => e.TimeUpdatedUtc).HasColumnType("datetimeoffset");
+            entity.HasIndex(e => new { e.TargetTemplateMatchId, e.TargetSlot }).IsUnique();
+            entity.HasIndex(e => new { e.SourceTemplateMatchId, e.SourceOutcome }).IsUnique();
+            entity.HasOne(e => e.TargetMatch)
+                .WithMany(m => m.IncomingFeeds)
+                .HasForeignKey(e => e.TargetTemplateMatchId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.SourceMatch)
+                .WithMany(m => m.OutgoingFeeds)
+                .HasForeignKey(e => e.SourceTemplateMatchId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         foreach (Type clrType in modelBuilder.Model.GetEntityTypes().Select(entityType => entityType.ClrType))
         {
             if (!typeof(BaseModel).IsAssignableFrom(clrType))

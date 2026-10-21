@@ -1,0 +1,64 @@
+@inject ITournamentTemplateStore TemplateStore
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3" Class="pt-2">
+            <MudTextField @bind-Value="name" Label="Name" Variant="Variant.Outlined" Required="true" />
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@errorMessage</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public TournamentTemplate? Template { get; set; }
+
+    private bool isCreate => Template is null;
+
+    private string name = string.Empty;
+
+    private string? errorMessage;
+
+    protected override void OnParametersSet()
+    {
+        name = Template?.Name ?? string.Empty;
+        errorMessage = null;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SaveAsync()
+    {
+        if (isCreate)
+        {
+            Result<TournamentTemplate> result = await TemplateStore.CreateAsync(name, CancellationToken.None);
+            if (!result.IsSuccess)
+            {
+                errorMessage = result.Error;
+                return;
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+            return;
+        }
+        Result<TournamentTemplate> updateResult = await TemplateStore.UpdateNameAsync(
+            Template!.TournamentTemplateId,
+            name,
+            Template.RowVersion,
+            CancellationToken.None);
+        if (!updateResult.IsSuccess)
+        {
+            errorMessage = updateResult.Error;
+            return;
+        }
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}
