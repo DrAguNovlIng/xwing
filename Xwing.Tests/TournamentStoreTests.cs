@@ -626,7 +626,7 @@ public sealed class TournamentStoreTests
     private const string SampleSquadJson = """
         {
           "faction": "rebelalliance",
-          "pilots": [{ "ship": "t-65-x-wing" }],
+          "pilots": [{ "id": "lukeskywalker", "ship": "t-65-x-wing" }],
           "vendor": { "yasb": { "url": "https://yasb.app/?d=test" } }
         }
         """;
@@ -667,7 +667,7 @@ public sealed class TournamentStoreTests
                 TestContext.Current.CancellationToken);
             TournamentMember member = members.Single(m => m.UserId == user.Value.UserId);
             member.SquadFactionDisplay.ShouldBe("Rebel Alliance");
-            member.SquadShipLabels.ShouldBe(["T-65 X-wing"]);
+            member.SquadShips.Single().PilotLabel.ShouldBe("Luke Skywalker");
             member.SquadUrl.ShouldBe("https://yasb.app/?d=test");
         }
     }

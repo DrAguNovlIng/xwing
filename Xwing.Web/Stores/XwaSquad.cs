@@ -8,8 +8,7 @@ public sealed record XwaSquad
 {
     public required string FactionId { get; init; }
     public required string FactionDisplayName { get; init; }
-    public required IReadOnlyList<string> ShipIds { get; init; }
-    public required IReadOnlyList<string> ShipDisplayNames { get; init; }
+    public required IReadOnlyList<XwaSquadPilotEntry> Pilots { get; init; }
 
     [SuppressMessage("Design", "CA1056:URI-like properties should not be strings", Justification = "Parsed absolute URL stored for persistence and href binding.")]
     public required string Url { get; init; }
@@ -48,7 +47,7 @@ public sealed record XwaSquad
             {
                 return Result.Fail<XwaSquad>("Squad must include pilots.");
             }
-            var shipIds = new List<string>();
+            var pilots = new List<XwaSquadPilotEntry>();
             foreach (JsonElement pilot in pilotsElement.EnumerateArray())
             {
                 if (pilot.ValueKind != JsonValueKind.Object ||
@@ -62,9 +61,13 @@ public sealed record XwaSquad
                 {
                     continue;
                 }
-                shipIds.Add(shipId.Trim());
+                pilots.Add(new XwaSquadPilotEntry
+                {
+                    ShipId = shipId.Trim(),
+                    PilotId = ReadPilotId(pilot),
+                });
             }
-            if (shipIds.Count == 0)
+            if (pilots.Count == 0)
             {
                 return Result.Fail<XwaSquad>("Squad must include at least one ship.");
             }
@@ -73,13 +76,11 @@ public sealed record XwaSquad
             {
                 return Result.Fail<XwaSquad>("Squad must include a build link in vendor metadata.");
             }
-            var shipDisplayNames = shipIds.Select(FormatShipDisplayName).ToList();
             return Result.Ok(new XwaSquad
             {
                 FactionId = factionId,
                 FactionDisplayName = FormatFactionDisplayName(factionId),
-                ShipIds = shipIds,
-                ShipDisplayNames = shipDisplayNames,
+                Pilots = pilots,
                 Url = url,
             });
         }
@@ -142,6 +143,26 @@ public sealed record XwaSquad
         };
     }
 
+    public static string? GetFactionThemeKey(string factionDisplayName)
+    {
+        if (string.IsNullOrWhiteSpace(factionDisplayName))
+        {
+            return null;
+        }
+
+        return factionDisplayName.Trim() switch
+        {
+            "Rebel Alliance" => "rebel-alliance",
+            "Galactic Empire" => "galactic-empire",
+            "Scum and Villainy" => "scum-and-villainy",
+            "Resistance" => "resistance",
+            "Separatist Alliance" => "separatist-alliance",
+            "First Order" => "first-order",
+            "Galactic Republic" => "galactic-republic",
+            _ => null,
+        };
+    }
+
     public static string? GetFactionIconSlug(string factionDisplayName)
     {
         if (string.IsNullOrWhiteSpace(factionDisplayName))
@@ -165,6 +186,31 @@ public sealed record XwaSquad
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(shipId);
         return shipId.Replace("-", string.Empty, StringComparison.Ordinal);
+    }
+
+    private static string? ReadPilotId(JsonElement pilot)
+    {
+        if (pilot.TryGetProperty("id", out JsonElement idElement) &&
+            idElement.ValueKind == JsonValueKind.String)
+        {
+            string? id = idElement.GetString()?.Trim();
+            if (!string.IsNullOrWhiteSpace(id))
+            {
+                return id;
+            }
+        }
+
+        if (pilot.TryGetProperty("name", out JsonElement nameElement) &&
+            nameElement.ValueKind == JsonValueKind.String)
+        {
+            string? name = nameElement.GetString()?.Trim();
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                return name;
+            }
+        }
+
+        return null;
     }
 
     private static string? FindVendorUrl(JsonElement element)

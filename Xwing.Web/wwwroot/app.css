@@ -37,27 +37,108 @@ h1:focus {
     text-align: start;
 }
 
-.squad-faction-row {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 4px;
-}
-
-.squad-faction-row .xwing-miniatures-font {
-    font-size: 22px;
-    line-height: 1;
-}
-
-.squad-ship-icons {
+.participant-header {
     display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
     align-items: center;
-    margin-top: 4px;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
 }
 
-.squad-ship-icons .xwing-miniatures-ship {
+.squad-faction-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+}
+
+.squad-faction-banner--plain {
+    padding-left: 0;
+}
+
+.squad-faction-banner .squad-faction-icon {
+    font-size: 24px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.squad-faction-banner .squad-faction-name {
+    font-weight: 600;
+}
+
+.squad-faction-banner[data-faction="rebel-alliance"] {
+    background: linear-gradient(90deg, rgba(226, 59, 47, 0.38) 0%, rgba(226, 59, 47, 0.12) 50%, transparent 100%);
+}
+
+.squad-faction-banner[data-faction="rebel-alliance"] .squad-faction-icon {
+    color: #E23B2F;
+}
+
+.squad-faction-banner[data-faction="galactic-empire"] {
+    background: linear-gradient(90deg, rgba(31, 122, 58, 0.38) 0%, rgba(31, 122, 58, 0.12) 50%, transparent 100%);
+}
+
+.squad-faction-banner[data-faction="galactic-empire"] .squad-faction-icon {
+    color: #1F7A3A;
+}
+
+.squad-faction-banner[data-faction="scum-and-villainy"] {
+    background: linear-gradient(90deg, rgba(230, 163, 23, 0.38) 0%, rgba(230, 163, 23, 0.12) 50%, transparent 100%);
+}
+
+.squad-faction-banner[data-faction="scum-and-villainy"] .squad-faction-icon {
+    color: #E6A317;
+}
+
+.squad-faction-banner[data-faction="resistance"] {
+    background: linear-gradient(90deg, rgba(241, 90, 34, 0.38) 0%, rgba(241, 90, 34, 0.12) 50%, transparent 100%);
+}
+
+.squad-faction-banner[data-faction="resistance"] .squad-faction-icon {
+    color: #F15A22;
+}
+
+.squad-faction-banner[data-faction="first-order"] {
+    background: linear-gradient(90deg, rgba(142, 27, 44, 0.38) 0%, rgba(142, 27, 44, 0.12) 50%, transparent 100%);
+}
+
+.squad-faction-banner[data-faction="first-order"] .squad-faction-icon {
+    color: #8E1B2C;
+}
+
+.squad-faction-banner[data-faction="galactic-republic"] {
+    background: linear-gradient(90deg, rgba(196, 163, 90, 0.42) 0%, rgba(196, 163, 90, 0.14) 50%, transparent 100%);
+}
+
+.squad-faction-banner[data-faction="galactic-republic"] .squad-faction-icon {
+    color: #C4A35A;
+}
+
+.squad-faction-banner[data-faction="separatist-alliance"] {
+    background: linear-gradient(90deg, rgba(28, 90, 166, 0.38) 0%, rgba(28, 90, 166, 0.12) 50%, transparent 100%);
+}
+
+.squad-faction-banner[data-faction="separatist-alliance"] .squad-faction-icon {
+    color: #1C5AA6;
+}
+
+.squad-pilot-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.squad-pilot-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.squad-pilot-row .xwing-miniatures-ship {
     font-size: 28px;
     line-height: 1;
+    flex-shrink: 0;
 }

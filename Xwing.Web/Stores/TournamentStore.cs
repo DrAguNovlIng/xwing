@@ -8,6 +8,11 @@ namespace Xwing.Web.Stores;
 
 public sealed class TournamentStore : ITournamentStore
 {
+    private static readonly JsonSerializerOptions SquadShipJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
     private readonly IDbContextFactory<XwingDbContext> contextFactory;
 
     private readonly StoreConcurrencyHelpers concurrencyHelpers;
@@ -197,44 +202,103 @@ public sealed class TournamentStore : ITournamentStore
         }
         XwaSquad squad = parsed.Value!;
         participant.SquadFaction = squad.FactionDisplayName;
-        participant.SquadShipsJson = JsonSerializer.Serialize(squad.ShipIds);
+        var shipEntries = squad.Pilots
+            .Select(p => new SquadShipJsonEntry { Ship = p.ShipId, Pilot = p.PilotId })
+            .ToList();
+        participant.SquadShipsJson = JsonSerializer.Serialize(shipEntries, SquadShipJsonOptions);
         participant.SquadUrl = squad.Url;
         return await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
     }
 
     private static TournamentMember MapMember(TournamentParticipant participant)
     {
-        List<string> shipIds = [];
-        List<string> shipLabels = [];
-        if (!string.IsNullOrEmpty(participant.SquadShipsJson))
-        {
-            try
-            {
-                string[]? parsedShipIds = JsonSerializer.Deserialize<string[]>(participant.SquadShipsJson);
-                if (parsedShipIds is not null)
-                {
-                    shipIds = parsedShipIds.ToList();
-                    shipLabels = shipIds.Select(XwaSquad.FormatShipDisplayName).ToList();
-                }
-            }
-            catch (JsonException)
-            {
-                shipIds = [];
-                shipLabels = [];
-            }
-        }
+        IReadOnlyList<SquadShipDisplay> ships = ParseSquadShipsJson(participant.SquadShipsJson);
         bool hasSquad = !string.IsNullOrEmpty(participant.SquadFaction) &&
-                        shipLabels.Count > 0 &&
+                        ships.Count > 0 &&
                         !string.IsNullOrEmpty(participant.SquadUrl);
         return new TournamentMember
         {
             UserId = participant.UserId,
             UserName = participant.User.UserName,
             SquadFactionDisplay = hasSquad ? participant.SquadFaction : null,
-            SquadShipIds = hasSquad ? shipIds : [],
-            SquadShipLabels = hasSquad ? shipLabels : [],
+            SquadShips = hasSquad ? ships : [],
             SquadUrl = hasSquad ? participant.SquadUrl : null,
         };
+    }
+
+    public static IReadOnlyList<SquadShipDisplay> ParseSquadShipsJson(string? squadShipsJson)
+    {
+        if (string.IsNullOrEmpty(squadShipsJson))
+        {
+            return [];
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(squadShipsJson);
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+            {
+                return [];
+            }
+
+            var ships = new List<SquadShipDisplay>();
+            foreach (JsonElement item in document.RootElement.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String)
+                {
+                    string? shipId = item.GetString();
+                    if (string.IsNullOrWhiteSpace(shipId))
+                    {
+                        continue;
+                    }
+
+                    string trimmedShipId = shipId.Trim();
+                    ships.Add(new SquadShipDisplay
+                    {
+                        ShipId = trimmedShipId,
+                        PilotLabel = XwaSquad.FormatShipDisplayName(trimmedShipId),
+                    });
+                    continue;
+                }
+
+                if (item.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                if (!item.TryGetProperty("ship", out JsonElement shipElement) ||
+                    shipElement.ValueKind != JsonValueKind.String)
+                {
+                    continue;
+                }
+
+                string? parsedShipId = shipElement.GetString();
+                if (string.IsNullOrWhiteSpace(parsedShipId))
+                {
+                    continue;
+                }
+
+                string trimmed = parsedShipId.Trim();
+                string? pilotId = null;
+                if (item.TryGetProperty("pilot", out JsonElement pilotElement) &&
+                    pilotElement.ValueKind == JsonValueKind.String)
+                {
+                    pilotId = pilotElement.GetString()?.Trim();
+                }
+
+                ships.Add(new SquadShipDisplay
+                {
+                    ShipId = trimmed,
+                    PilotLabel = XwsPilotCatalog.ResolvePilotLabel(pilotId, trimmed),
+                });
+            }
+
+            return ships;
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     public async Task<Result> JoinAsync(int tournamentId, int userId, CancellationToken cancellationToken)
@@ -388,9 +452,22 @@ public sealed record TournamentMember
     public int UserId { get; init; }
     public string UserName { get; init; } = string.Empty;
     public string? SquadFactionDisplay { get; init; }
-    public IReadOnlyList<string> SquadShipIds { get; init; } = [];
-    public IReadOnlyList<string> SquadShipLabels { get; init; } = [];
+    public IReadOnlyList<SquadShipDisplay> SquadShips { get; init; } = [];
 
     [SuppressMessage("Design", "CA1056:URI-like properties should not be strings", Justification = "Blazor href binding uses string URLs.")]
     public string? SquadUrl { get; init; }
+}
+
+public sealed record SquadShipDisplay
+{
+    public required string ShipId { get; init; }
+
+    public required string PilotLabel { get; init; }
+}
+
+internal sealed record SquadShipJsonEntry
+{
+    public required string Ship { get; init; }
+
+    public string? Pilot { get; init; }
 }

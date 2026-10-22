@@ -47,7 +47,11 @@ else
     </MudStack>
     @if (!string.IsNullOrEmpty(joinTimeLeftLabel))
     {
-        <MudText Typo="Typo.body2" Class="mb-4">@joinTimeLeftLabel</MudText>
+        <MudText Typo="Typo.body2"
+                 Class="mb-4"
+                 Color="@(joinTimeLeftUrgent ? Color.Error : Color.Default)">
+            @joinTimeLeftLabel
+        </MudText>
     }
     @if (rosterOpen)
     {
@@ -94,35 +98,38 @@ else
             @foreach (TournamentMember member in members)
             {
                 <MudPaper Class="pa-3" Elevation="0" Outlined="true">
-                    <MudText Typo="Typo.subtitle1">@member.UserName</MudText>
-                    @if (!string.IsNullOrEmpty(member.SquadFactionDisplay))
-                    {
-                        <div class="squad-faction-row">
-                            @if (GetFactionIconSlug(member.SquadFactionDisplay) is string factionSlug)
-                            {
-                                <i class="@($"xwing-miniatures-font xwing-miniatures-font-{factionSlug}")"
-                                   aria-hidden="true"></i>
-                            }
-                            <MudText Typo="Typo.body2">@member.SquadFactionDisplay</MudText>
-                        </div>
-                        <div class="squad-ship-icons">
-                            @for (int shipIndex = 0; shipIndex < member.SquadShipIds.Count; shipIndex++)
-                            {
-                                string shipLabel = member.SquadShipLabels[shipIndex];
-                                string shipSlug = GetShipIconSlug(member.SquadShipIds[shipIndex]);
-                                <span aria-label="@shipLabel">
-                                    <i class="@($"xwing-miniatures-ship xwing-miniatures-ship-{shipSlug}")"
-                                       aria-hidden="true"></i>
-                                </span>
-                            }
-                        </div>
-                        <MudText Typo="Typo.body2">@FormatShipList(member.SquadShipLabels)</MudText>
+                    <div class="participant-header">
+                        <MudText Typo="Typo.subtitle1">@member.UserName</MudText>
                         @if (!string.IsNullOrEmpty(member.SquadUrl))
                         {
-                            <MudLink Href="@member.SquadUrl" Target="_blank" Class="mt-1 d-inline-block">
+                            <MudLink Href="@member.SquadUrl" Target="_blank">
                                 View build
                             </MudLink>
                         }
+                    </div>
+                    @if (!string.IsNullOrEmpty(member.SquadFactionDisplay))
+                    {
+                        var factionThemeKey = GetFactionThemeKey(member.SquadFactionDisplay);
+                        <div class="squad-faction-banner @(factionThemeKey is null ? "squad-faction-banner--plain" : null)"
+                             data-faction="@factionThemeKey">
+                            @if (GetFactionIconSlug(member.SquadFactionDisplay) is string factionSlug)
+                            {
+                                <i class="@($"xwing-miniatures-font xwing-miniatures-font-{factionSlug} squad-faction-icon")"
+                                   aria-hidden="true"></i>
+                            }
+                            <MudText Typo="Typo.body2" Class="squad-faction-name">@member.SquadFactionDisplay</MudText>
+                        </div>
+                        <div class="squad-pilot-rows">
+                            @foreach (SquadShipDisplay ship in member.SquadShips)
+                            {
+                                string shipSlug = GetShipIconSlug(ship.ShipId);
+                                <div class="squad-pilot-row">
+                                    <i class="@($"xwing-miniatures-ship xwing-miniatures-ship-{shipSlug}")"
+                                       aria-hidden="true"></i>
+                                    <MudText Typo="Typo.body2">@ship.PilotLabel</MudText>
+                                </div>
+                            }
+                        </div>
                     }
                 </MudPaper>
             }
@@ -156,6 +163,8 @@ else
 
     private string? joinTimeLeftLabel;
 
+    private bool joinTimeLeftUrgent;
+
     private PeriodicTimer? countdownTimer;
 
     private CancellationTokenSource? countdownCts;
@@ -179,6 +188,7 @@ else
         else
         {
             joinTimeLeftLabel = null;
+            joinTimeLeftUrgent = false;
             rosterOpen = false;
         }
         loading = false;
@@ -201,16 +211,22 @@ else
         {
             rosterOpen = false;
             joinTimeLeftLabel = null;
+            joinTimeLeftUrgent = false;
             return;
         }
         todayUtc = TournamentSchedule.TodayUtc(TimeProvider);
         rosterOpen = TournamentSchedule.GetStatus(tournament, todayUtc) == TournamentLifecycleStatus.Upcoming;
+        DateTimeOffset utcNow = TimeProvider.GetUtcNow();
         joinTimeLeftLabel = rosterOpen
-            ? TournamentSchedule.FormatTimeLeftToJoin(tournament, TimeProvider.GetUtcNow())
+            ? TournamentSchedule.FormatTimeLeftToJoin(tournament, utcNow)
             : null;
+        joinTimeLeftUrgent = rosterOpen &&
+                             joinTimeLeftLabel is not null &&
+                             TournamentSchedule.TimeLeftToJoinUsesMinuteRefresh(tournament, utcNow);
         if (joinTimeLeftLabel is null)
         {
             rosterOpen = false;
+            joinTimeLeftUrgent = false;
         }
     }
 
@@ -363,8 +379,8 @@ else
     private static string FormatDate(DateTimeOffset value) =>
         value.UtcDateTime.ToString("d", CultureInfo.CurrentCulture);
 
-    private static string FormatShipList(IReadOnlyList<string> ships) =>
-        ships.Count == 0 ? string.Empty : string.Join(", ", ships);
+    private static string? GetFactionThemeKey(string factionDisplayName) =>
+        XwaSquad.GetFactionThemeKey(factionDisplayName);
 
     private static string? GetFactionIconSlug(string factionDisplayName) =>
         XwaSquad.GetFactionIconSlug(factionDisplayName);
