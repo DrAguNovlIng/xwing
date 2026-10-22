@@ -6,9 +6,6 @@ using Xwing.Web.Models;
 namespace Xwing.Web.Stores;
 public sealed class TournamentBracketStore : ITournamentBracketStore
 {
-    private const int NewMatchColumnsPerRow = 12;
-    private const int NewMatchStrideX = 5;
-    private const int NewMatchStrideY = 3;
     private readonly IDbContextFactory<XwingDbContext> contextFactory;
     private readonly ITournamentTemplateStore templateStore;
     private readonly StoreConcurrencyHelpers concurrencyHelpers;
@@ -170,23 +167,23 @@ public sealed class TournamentBracketStore : ITournamentBracketStore
     public async Task<Result<TournamentMatch>> AddMatchAsync(int tournamentId, CancellationToken cancellationToken)
     {
         await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-        bool exists = await context.Tournaments
+        Tournament? tournament = await context.Tournaments
             .AsNoTracking()
-            .AnyAsync(t => t.TournamentId == tournamentId, cancellationToken)
+            .SingleOrDefaultAsync(t => t.TournamentId == tournamentId, cancellationToken)
             .ConfigureAwait(false);
-        if (!exists)
+        if (tournament is null)
         {
             return Result.Fail<TournamentMatch>("Tournament not found.");
         }
 
-        int matchCount = await context.TournamentMatches
-            .CountAsync(m => m.TournamentId == tournamentId, cancellationToken)
-            .ConfigureAwait(false);
+        (int positionX, int positionY) = BracketGraphLayout.CenterMatchPosition(
+            tournament.GraphWidthCells,
+            tournament.GraphHeightCells);
         var match = new TournamentMatch
         {
             TournamentId = tournamentId,
-            PositionX = (matchCount % NewMatchColumnsPerRow) * NewMatchStrideX,
-            PositionY = (matchCount / NewMatchColumnsPerRow) * NewMatchStrideY,
+            PositionX = positionX,
+            PositionY = positionY,
             Status = TournamentMatchStatus.NotStarted,
             PlayMode = TournamentMatchPlayMode.Offline,
             Winner = TournamentMatchWinner.None,

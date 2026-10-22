@@ -15,6 +15,30 @@ public sealed class TournamentTemplateStoreTests
     }
 
     [Fact]
+    public async Task AddMatchAsyncShouldPlaceMatchAtCanvasCenter()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<TournamentTemplate> template = await stores.Templates.CreateAsync(
+                "Center test",
+                TestContext.Current.CancellationToken);
+            template.IsSuccess.ShouldBeTrue();
+            (int expectedX, int expectedY) = BracketGraphLayout.CenterMatchPosition(
+                template.Value!.GraphWidthCells,
+                template.Value.GraphHeightCells);
+            Result<TemplateMatch> match = await stores.Templates.AddMatchAsync(
+                template.Value.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            match.IsSuccess.ShouldBeTrue();
+            match.Value!.PositionX.ShouldBe(expectedX);
+            match.Value.PositionY.ShouldBe(expectedY);
+        }
+    }
+
+    [Fact]
     public async Task SetSlotFeedAsyncShouldWireWinnerChain()
     {
         TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(

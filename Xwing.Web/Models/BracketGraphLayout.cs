@@ -14,6 +14,10 @@ public static class BracketGraphLayout
         Math.Max(0, (graphWidthCells * CellSize - BoxOffset - BoxWidth) / CellSize);
     public static int MaxMatchPositionY(int graphHeightCells) =>
         Math.Max(0, (graphHeightCells * CellSize - BoxOffset - BoxHeight) / CellSize);
+
+    public static (int PositionX, int PositionY) CenterMatchPosition(int graphWidthCells, int graphHeightCells) =>
+        (MaxMatchPositionX(graphWidthCells) / 2, MaxMatchPositionY(graphHeightCells) / 2);
+
     public static Result? ValidateGraphSize(int widthCells, int heightCells)
     {
         if (widthCells < MinGraphCells || heightCells < MinGraphCells)

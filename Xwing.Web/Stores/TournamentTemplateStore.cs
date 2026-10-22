@@ -5,9 +5,6 @@ using Xwing.Web.Models;
 namespace Xwing.Web.Stores;
 public sealed class TournamentTemplateStore : ITournamentTemplateStore
 {
-    private const int NewMatchColumnsPerRow = 12;
-    private const int NewMatchStrideX = 5;
-    private const int NewMatchStrideY = 3;
     private readonly IDbContextFactory<XwingDbContext> contextFactory;
     private readonly StoreConcurrencyHelpers concurrencyHelpers;
     public TournamentTemplateStore(
@@ -182,22 +179,23 @@ public sealed class TournamentTemplateStore : ITournamentTemplateStore
     public async Task<Result<TemplateMatch>> AddMatchAsync(int tournamentTemplateId, CancellationToken cancellationToken)
     {
         await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-        bool templateExists = await context.TournamentTemplates
+        TournamentTemplate? template = await context.TournamentTemplates
             .AsNoTracking()
-            .AnyAsync(t => t.TournamentTemplateId == tournamentTemplateId, cancellationToken)
+            .SingleOrDefaultAsync(t => t.TournamentTemplateId == tournamentTemplateId, cancellationToken)
             .ConfigureAwait(false);
-        if (!templateExists)
+        if (template is null)
         {
             return Result.Fail<TemplateMatch>("Template not found.");
         }
-        int matchCount = await context.TemplateMatches
-            .CountAsync(m => m.TournamentTemplateId == tournamentTemplateId, cancellationToken)
-            .ConfigureAwait(false);
+
+        (int positionX, int positionY) = BracketGraphLayout.CenterMatchPosition(
+            template.GraphWidthCells,
+            template.GraphHeightCells);
         var match = new TemplateMatch
         {
             TournamentTemplateId = tournamentTemplateId,
-            PositionX = (matchCount % NewMatchColumnsPerRow) * NewMatchStrideX,
-            PositionY = (matchCount / NewMatchColumnsPerRow) * NewMatchStrideY,
+            PositionX = positionX,
+            PositionY = positionY,
         };
         context.TemplateMatches.Add(match);
         Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
