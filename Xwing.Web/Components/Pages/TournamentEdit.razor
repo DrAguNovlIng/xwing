@@ -1,0 +1,1320 @@
+﻿@page "/tournaments/{TournamentId:int}/edit"
+
+@attribute [Authorize(Roles = UserRoles.Admin)]
+
+@using Xwing.Web.Data
+@using Xwing.Web.Components.Dialogs
+@using Xwing.Web.Models
+@using Xwing.Web.Stores
+@inject ITournamentBracketStore BracketStore
+@inject ITournamentTemplateStore TemplateStore
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+
+<PageTitle>@pageTitle</PageTitle>
+
+<MudStack Spacing="2">
+    <MudToolBar Gutters="false" WrapContent="true">
+        <MudButton StartIcon="@Icons.Material.Filled.ArrowBack"
+                   Variant="Variant.Text"
+                   OnClick="@(() => Navigation.NavigateTo($"/tournaments/{TournamentId}"))">
+            Tournament
+        </MudButton>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   Disabled="@(graph is null)"
+                   OnClick="AddMatchAsync">
+            Add match
+        </MudButton>
+    </MudToolBar>
+    <MudText Typo="Typo.h5">@pageTitle</MudText>
+    @if (graph is not null)
+    {
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Class="mb-2">
+            <MudSelect T="int?"
+                       Label="Apply template"
+                       Variant="Variant.Outlined"
+                       Value="selectedTemplateId"
+                       ValueChanged="OnTemplateSelectedAsync"
+                       Style="min-width: 16rem;">
+                <MudSelectItem T="int?" Value="@((int?)null)">—</MudSelectItem>
+                @foreach (TournamentTemplate template in templates)
+                {
+                    <MudSelectItem T="int?" Value="@template.TournamentTemplateId">@template.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudStack>
+    }
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <MudAlert Severity="@statusSeverity" Dense="true">@statusMessage</MudAlert>
+    }
+    @if (graph is null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else
+    {
+        <MudGrid>
+            <MudItem xs="12" md="@(selectedMatch is null ? 12 : 9)">
+                <div class="template-graph-surface @(draggingMatchId is not null ? "template-graph-surface-dragging" : string.Empty)"
+                     style="@SurfaceStyle"
+                     @onpointermove="OnSurfacePointerMove"
+                     @onpointerup="OnSurfacePointerUp"
+                     @onpointercancel="OnSurfacePointerUp">
+                    <svg class="template-graph-edges"
+                         width="@surfaceWidth"
+                         height="@surfaceHeight"
+                         xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <marker id="template-edge-winner"
+                                    markerWidth="8"
+                                    markerHeight="8"
+                                    refX="7"
+                                    refY="4"
+                                    orient="auto"
+                                    markerUnits="strokeWidth">
+                                <path d="M0,0 L8,4 L0,8 Z" fill="var(--mud-palette-success)" />
+                            </marker>
+                            <marker id="template-edge-loser"
+                                    markerWidth="8"
+                                    markerHeight="8"
+                                    refX="7"
+                                    refY="4"
+                                    orient="auto"
+                                    markerUnits="strokeWidth">
+                                <path d="M0,0 L8,4 L0,8 Z" fill="var(--mud-palette-warning)" />
+                            </marker>
+                        </defs>
+                        @foreach (TournamentMatchFeed feed in graph.Feeds)
+                        {
+                            (double x1, double y1) = GetSourceAnchor(feed.SourceTournamentMatchId);
+                            (double x2, double y2) = GetSlotAnchor(feed.TargetTournamentMatchId, feed.TargetSlot);
+                            bool isWinner = feed.SourceOutcome == TemplateFeedOutcome.Winner;
+                            string strokeColor = isWinner
+                                ? "var(--mud-palette-success)"
+                                : "var(--mud-palette-warning)";
+                            string markerEnd = isWinner
+                                ? "url(#template-edge-winner)"
+                                : "url(#template-edge-loser)";
+                            <line x1="@x1.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                                  y1="@y1.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                                  x2="@x2.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                                  y2="@y2.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                                  stroke="@strokeColor"
+                                  stroke-width="2.5"
+                                  marker-end="@markerEnd" />
+                        }
+                    </svg>
+                    @foreach (TournamentMatch match in graph.Matches)
+                    {
+                        bool isDragging = draggingMatchId == match.TournamentMatchId;
+                        if (isDragging)
+                        {
+                            <div class="template-match-box template-match-box-ghost"
+                                 style="@GetBoxStyle(match.PositionX, match.PositionY)">
+                                <div class="template-match-drag-handle">
+                                    <MudIcon Icon="@Icons.Material.Filled.DragIndicator" Size="Size.Small" />
+                                    <div class="template-match-box-header">
+                                        <MudText Typo="Typo.subtitle2">@DisplayName(match)</MudText>
+                                        @if (match.PlayMode == TournamentMatchPlayMode.Online)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Info">Online</MudChip>
+                                        }
+                                    </div>
+                                </div>
+                                <MudText Typo="Typo.caption" Class="@GetSlotLineClass(match, TemplateMatchSlot.A)">A: @FormatSlot(match, TemplateMatchSlot.A)</MudText>
+                                <MudText Typo="Typo.caption" Class="@GetSlotLineClass(match, TemplateMatchSlot.B)">B: @FormatSlot(match, TemplateMatchSlot.B)</MudText>
+                            </div>
+                        }
+                        int displayX = isDragging ? dragCellX : match.PositionX;
+                        int displayY = isDragging ? dragCellY : match.PositionY;
+                        <div class="template-match-box @GetMatchStatusClass(match) @(selectedMatch?.TournamentMatchId == match.TournamentMatchId ? "selected" : string.Empty) @(isDragging ? "dragging" : string.Empty)"
+                             style="@GetBoxStyle(displayX, displayY)"
+                             @onpointerdown="@(async _ => await SelectMatchAsync(match))"
+                             @onpointerdown:stopPropagation="true">
+                            <div class="template-match-drag-handle"
+                                 @onpointerdown="@(e => StartDrag(e, match))"
+                                 @onpointerdown:stopPropagation="true">
+                                <MudIcon Icon="@Icons.Material.Filled.DragIndicator" Size="Size.Small" />
+                                <div class="template-match-box-header">
+                                    <MudText Typo="Typo.subtitle2">@DisplayName(match)</MudText>
+                                    @if (match.PlayMode == TournamentMatchPlayMode.Online)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Info">Online</MudChip>
+                                    }
+                                </div>
+                            </div>
+                            <MudText Typo="Typo.caption" Class="@GetSlotLineClass(match, TemplateMatchSlot.A)">A: @FormatSlot(match, TemplateMatchSlot.A)</MudText>
+                            <MudText Typo="Typo.caption" Class="@GetSlotLineClass(match, TemplateMatchSlot.B)">B: @FormatSlot(match, TemplateMatchSlot.B)</MudText>
+                        </div>
+                    }
+                </div>
+            </MudItem>
+            @if (selectedMatch is not null)
+            {
+                <MudItem xs="12" md="3">
+                    <MudPaper Class="pa-4" Elevation="2">
+                        <MudText Typo="Typo.h6" Class="mb-3">Match</MudText>
+                        <div @onfocusin="OnMatchNameFocus">
+                            <MudTextField @bind-Value="editMatchName"
+                                          Label="Name"
+                                          Variant="Variant.Outlined"
+                                          Class="mb-3"
+                                          Immediate="true"
+                                          OnBlur="OnMatchNameBlurAsync" />
+                        </div>
+                        <MudNumericField T="int?"
+                                         Value="editRoundNumber"
+                                         ValueChanged="OnEditRoundChangedAsync"
+                                         Label="Round"
+                                         Variant="Variant.Outlined"
+                                         Min="1"
+                                         Class="mb-4" />
+                        <MudDivider Class="my-3" />
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Results</MudText>
+                        <MudSelect T="TournamentMatchStatus"
+                                   Value="editStatus"
+                                   ValueChanged="OnEditStatusChangedAsync"
+                                   Label="Status"
+                                   Variant="Variant.Outlined"
+                                   Class="mb-2">
+                            <MudSelectItem Value="TournamentMatchStatus.NotStarted">Not started</MudSelectItem>
+                            <MudSelectItem Value="TournamentMatchStatus.InProgress">In progress</MudSelectItem>
+                            <MudSelectItem Value="TournamentMatchStatus.Finished">Finished</MudSelectItem>
+                        </MudSelect>
+                        <MudSelect T="TournamentMatchPlayMode"
+                                   Value="editPlayMode"
+                                   ValueChanged="OnEditPlayModeChangedAsync"
+                                   Label="Play mode"
+                                   Variant="Variant.Outlined"
+                                   Class="mb-2">
+                            <MudSelectItem Value="TournamentMatchPlayMode.Offline">Offline</MudSelectItem>
+                            <MudSelectItem Value="TournamentMatchPlayMode.Online">Online</MudSelectItem>
+                        </MudSelect>
+                        <div @onfocusin="OnReplayUrlFocus">
+                            <MudTextField @bind-Value="editReplayUrl"
+                                          Label="@ReplayUrlFieldLabel"
+                                          Variant="Variant.Outlined"
+                                          Class="mb-2"
+                                          Immediate="true"
+                                          OnBlur="OnReplayUrlBlurAsync" />
+                        </div>
+                        <MudSelect T="int?"
+                                   Label="Slot A player"
+                                   Variant="Variant.Outlined"
+                                   Value="editSlotAUserId"
+                                   ValueChanged="OnEditSlotAUserChangedAsync"
+                                   ToStringFunc="FormatPlayerSelect"
+                                   Class="mb-2">
+                            <MudSelectItem T="int?" Value="@((int?)null)">—</MudSelectItem>
+                            @foreach (TournamentBracketParticipant player in AssignablePlayers(selectedMatch))
+                            {
+                                <MudSelectItem T="int?" Value="@player.UserId">@player.UserName</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudNumericField T="int?"
+                                         Value="editSlotAPoints"
+                                         ValueChanged="OnEditSlotAPointsChangedAsync"
+                                         Label="Slot A points"
+                                         Variant="Variant.Outlined"
+                                         Min="0"
+                                         Class="mb-2" />
+                        <MudSelect T="int?"
+                                   Label="Slot B player"
+                                   Variant="Variant.Outlined"
+                                   Value="editSlotBUserId"
+                                   ValueChanged="OnEditSlotBUserChangedAsync"
+                                   ToStringFunc="FormatPlayerSelect"
+                                   Class="mb-2">
+                            <MudSelectItem T="int?" Value="@((int?)null)">—</MudSelectItem>
+                            @foreach (TournamentBracketParticipant player in AssignablePlayers(selectedMatch))
+                            {
+                                <MudSelectItem T="int?" Value="@player.UserId">@player.UserName</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudNumericField T="int?"
+                                         Value="editSlotBPoints"
+                                         ValueChanged="OnEditSlotBPointsChangedAsync"
+                                         Label="Slot B points"
+                                         Variant="Variant.Outlined"
+                                         Min="0"
+                                         Class="mb-2" />
+                        <MudSelect T="TournamentMatchWinner"
+                                   Value="editWinner"
+                                   ValueChanged="OnEditWinnerChangedAsync"
+                                   Label="Winner"
+                                   Variant="Variant.Outlined"
+                                   Class="mb-4">
+                            <MudSelectItem Value="TournamentMatchWinner.None">Neither</MudSelectItem>
+                            <MudSelectItem Value="TournamentMatchWinner.SlotA">Slot A</MudSelectItem>
+                            <MudSelectItem Value="TournamentMatchWinner.SlotB">Slot B</MudSelectItem>
+                        </MudSelect>
+                        <MudDivider Class="my-3" />
+                        <MudSelect T="string"
+                                   Label="Slot A"
+                                   Variant="Variant.Outlined"
+                                   Value="@slotAValue"
+                                   ValueChanged="OnSlotAChangedAsync"
+                                   ToStringFunc="FormatStructureSlotSelect"
+                                   Class="mb-2">
+                            <MudSelectItem T="string" Value="@OpenSlotValue">Custom entrant</MudSelectItem>
+                            @foreach (TournamentMatch other in OtherMatches(selectedMatch))
+                            {
+                                if (IsOutcomeAvailableForSlot(other.TournamentMatchId, TemplateFeedOutcome.Winner, TemplateMatchSlot.A))
+                                {
+                                    <MudSelectItem T="string" Value="@WinnerSlotValue(other.TournamentMatchId)">Winner of @DisplayName(other)</MudSelectItem>
+                                }
+                                if (IsOutcomeAvailableForSlot(other.TournamentMatchId, TemplateFeedOutcome.Loser, TemplateMatchSlot.A))
+                                {
+                                    <MudSelectItem T="string" Value="@LoserSlotValue(other.TournamentMatchId)">Loser of @DisplayName(other)</MudSelectItem>
+                                }
+                            }
+                        </MudSelect>
+                        @if (slotAValue == OpenSlotValue)
+                        {
+                            <div @onfocusin="OnSlotAOpenLabelFocus">
+                                <MudTextField @bind-Value="editSlotAOpenLabel"
+                                              Label="Slot A entrant text"
+                                              Variant="Variant.Outlined"
+                                              Class="mb-3"
+                                              OnBlur="OnSlotAOpenLabelBlurAsync" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mb-3" />
+                        }
+                        <MudSelect T="string"
+                                   Label="Slot B"
+                                   Variant="Variant.Outlined"
+                                   Value="@slotBValue"
+                                   ValueChanged="OnSlotBChangedAsync"
+                                   ToStringFunc="FormatStructureSlotSelect"
+                                   Class="mb-2">
+                            <MudSelectItem T="string" Value="@OpenSlotValue">Custom entrant</MudSelectItem>
+                            @foreach (TournamentMatch other in OtherMatches(selectedMatch))
+                            {
+                                if (IsOutcomeAvailableForSlot(other.TournamentMatchId, TemplateFeedOutcome.Winner, TemplateMatchSlot.B))
+                                {
+                                    <MudSelectItem T="string" Value="@WinnerSlotValue(other.TournamentMatchId)">Winner of @DisplayName(other)</MudSelectItem>
+                                }
+                                if (IsOutcomeAvailableForSlot(other.TournamentMatchId, TemplateFeedOutcome.Loser, TemplateMatchSlot.B))
+                                {
+                                    <MudSelectItem T="string" Value="@LoserSlotValue(other.TournamentMatchId)">Loser of @DisplayName(other)</MudSelectItem>
+                                }
+                            }
+                        </MudSelect>
+                        @if (slotBValue == OpenSlotValue)
+                        {
+                            <div @onfocusin="OnSlotBOpenLabelFocus">
+                                <MudTextField @bind-Value="editSlotBOpenLabel"
+                                              Label="Slot B entrant text"
+                                              Variant="Variant.Outlined"
+                                              Class="mb-4"
+                                              OnBlur="OnSlotBOpenLabelBlurAsync" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mb-4" />
+                        }
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Error"
+                                   FullWidth="true"
+                                   OnClick="DeleteSelectedMatchAsync">
+                            Delete match
+                        </MudButton>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudStack>
+
+<style>
+    .template-graph-surface {
+        position: relative;
+        border: 1px solid var(--mud-palette-lines-default);
+        border-radius: 4px;
+        background-color: var(--mud-palette-background-gray);
+        background-image:
+            linear-gradient(to right, color-mix(in srgb, var(--mud-palette-lines-default) 35%, transparent) 1px, transparent 1px),
+            linear-gradient(to bottom, color-mix(in srgb, var(--mud-palette-lines-default) 35%, transparent) 1px, transparent 1px);
+        background-size: 40px 40px;
+        overflow: auto;
+    }
+
+    .template-graph-surface-dragging .template-match-box:not(.template-match-box-ghost) {
+        pointer-events: none;
+    }
+
+    .template-graph-surface-dragging .template-match-drag-handle {
+        cursor: grabbing;
+    }
+
+    .template-graph-edges {
+        position: absolute;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+    }
+
+    .template-match-box {
+        position: absolute;
+        width: 168px;
+        padding: 4px 8px 8px;
+        border-radius: 4px;
+        border: 2px solid var(--mud-palette-lines-default);
+        background: var(--mud-palette-surface);
+        cursor: pointer;
+        user-select: none;
+        touch-action: none;
+        z-index: 1;
+    }
+
+    .template-match-box.selected {
+        border-color: var(--mud-palette-primary);
+    }
+
+    .template-match-box.dragging {
+        z-index: 2;
+        box-shadow: 0 4px 12px color-mix(in srgb, var(--mud-palette-text-primary) 25%, transparent);
+    }
+
+    .template-match-box-ghost {
+        opacity: 0.35;
+        border-style: dashed;
+        pointer-events: none;
+        z-index: 0;
+        cursor: default;
+    }
+
+    .template-match-drag-handle {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        cursor: grab;
+        margin-bottom: 4px;
+    }
+
+    .slot-line {
+        display: block;
+        line-height: 1.3;
+    }
+</style>
+
+@code {
+    private const int CellSize = 40;
+    private const int BoxOffset = 6;
+    private const int BoxWidth = 168;
+    private const int BoxHeight = 88;
+    private const int MinSurfaceCells = 30;
+    private const string OpenSlotValue = "open";
+
+    [Parameter]
+    public int TournamentId { get; set; }
+
+    private TournamentBracketGraph? graph;
+
+    private TournamentMatch? selectedMatch;
+
+    private string editMatchName = string.Empty;
+
+    private string slotAValue = OpenSlotValue;
+
+    private string slotBValue = OpenSlotValue;
+
+    private string editSlotAOpenLabel = string.Empty;
+
+    private string editSlotBOpenLabel = string.Empty;
+
+    private int? editRoundNumber;
+
+    private TournamentMatchStatus editStatus = TournamentMatchStatus.NotStarted;
+
+    private TournamentMatchPlayMode editPlayMode = TournamentMatchPlayMode.Offline;
+
+    private string? editReplayUrl;
+
+    private int? editSlotAUserId;
+
+    private int? editSlotBUserId;
+
+    private int? editSlotAPoints;
+
+    private int? editSlotBPoints;
+
+    private TournamentMatchWinner editWinner = TournamentMatchWinner.None;
+
+    private IReadOnlyList<TournamentTemplate> templates = [];
+
+    private int? selectedTemplateId;
+
+    private string pageTitle = "Tournament";
+
+    private string? statusMessage;
+
+    private Severity statusSeverity = Severity.Info;
+
+    private int? draggingMatchId;
+
+    private int dragCellX;
+
+    private int dragCellY;
+
+    private long? activePointerId;
+
+    private int? _boundMatchId;
+
+    private int? _nameFocusMatchId;
+
+    private int? _replayFocusMatchId;
+
+    private int? _slotAOpenLabelFocusMatchId;
+
+    private int? _slotBOpenLabelFocusMatchId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        templates = await TemplateStore.ListAsync(CancellationToken.None);
+        await LoadGraphAsync();
+    }
+
+    private async Task LoadGraphAsync()
+    {
+        Result<TournamentBracketGraph> result = await BracketStore.GetGraphAsync(TournamentId, CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Template not found.", Severity.Error);
+            graph = null;
+            return;
+        }
+        graph = result.Value!;
+        pageTitle = graph.Tournament.Name;
+        selectedTemplateId = graph.Tournament.TournamentTemplateId;
+        if (selectedMatch is not null)
+        {
+            selectedMatch = graph.Matches.FirstOrDefault(m => m.TournamentMatchId == selectedMatch.TournamentMatchId);
+            SyncSidePanel();
+        }
+    }
+
+    private int surfaceWidth => ComputeSurfaceWidth();
+
+    private int surfaceHeight => ComputeSurfaceHeight();
+
+    private string SurfaceStyle => $"width: {surfaceWidth}px; height: {surfaceHeight}px; min-width: 100%;";
+
+    private int ComputeSurfaceWidth()
+    {
+        if (graph is null || graph.Matches.Count == 0)
+        {
+            return CellSize * MinSurfaceCells;
+        }
+        int maxRight = graph.Matches.Max(m => GetBoxRight(m));
+        return Math.Max(CellSize * MinSurfaceCells, maxRight + CellSize * 2);
+    }
+
+    private int ComputeSurfaceHeight()
+    {
+        if (graph is null || graph.Matches.Count == 0)
+        {
+            return CellSize * MinSurfaceCells;
+        }
+        int maxBottom = graph.Matches.Max(m => GetBoxBottom(m));
+        return Math.Max(CellSize * MinSurfaceCells, maxBottom + CellSize * 2);
+    }
+
+    private int GetCellX(TournamentMatch match) =>
+        draggingMatchId == match.TournamentMatchId ? dragCellX : match.PositionX;
+
+    private int GetCellY(TournamentMatch match) =>
+        draggingMatchId == match.TournamentMatchId ? dragCellY : match.PositionY;
+
+    private int GetBoxRight(TournamentMatch match) =>
+        GetCellX(match) * CellSize + BoxOffset + BoxWidth;
+
+    private int GetBoxBottom(TournamentMatch match) =>
+        GetCellY(match) * CellSize + BoxOffset + BoxHeight;
+
+    private static string GetBoxStyle(int cellX, int cellY) =>
+        $"left: {cellX * CellSize + BoxOffset}px; top: {cellY * CellSize + BoxOffset}px;";
+
+    private async Task SelectMatchAsync(TournamentMatch match)
+    {
+        if (draggingMatchId is not null)
+        {
+            return;
+        }
+
+        if (selectedMatch?.TournamentMatchId == match.TournamentMatchId)
+        {
+            return;
+        }
+
+        if (_boundMatchId is int previousId && previousId != match.TournamentMatchId)
+        {
+            SidePanelSnapshot snapshot = CaptureSidePanelSnapshot();
+            ClearFieldFocusMatchIds();
+            await ApplySidePanelSnapshotAsync(previousId, snapshot);
+        }
+
+        selectedMatch = match;
+        SyncSidePanel();
+    }
+
+    private void SyncSidePanel()
+    {
+        if (selectedMatch is null || graph is null)
+        {
+            _boundMatchId = null;
+            return;
+        }
+
+        editMatchName = selectedMatch.Name ?? string.Empty;
+        slotAValue = GetSlotSelectValue(selectedMatch, TemplateMatchSlot.A);
+        slotBValue = GetSlotSelectValue(selectedMatch, TemplateMatchSlot.B);
+        editSlotAOpenLabel = selectedMatch.SlotAOpenLabel ?? string.Empty;
+        editSlotBOpenLabel = selectedMatch.SlotBOpenLabel ?? string.Empty;
+        editRoundNumber = selectedMatch.RoundNumber;
+        editStatus = selectedMatch.Status;
+        editPlayMode = selectedMatch.PlayMode;
+        editReplayUrl = selectedMatch.ReplayUrl;
+        editSlotAUserId = selectedMatch.SlotAUserId;
+        editSlotBUserId = selectedMatch.SlotBUserId;
+        editSlotAPoints = selectedMatch.SlotAPoints;
+        editSlotBPoints = selectedMatch.SlotBPoints;
+        editWinner = selectedMatch.Winner;
+        _boundMatchId = selectedMatch.TournamentMatchId;
+    }
+
+    private sealed record SidePanelSnapshot(
+        string MatchName,
+        int? RoundNumber,
+        TournamentMatchStatus Status,
+        TournamentMatchPlayMode PlayMode,
+        string? ReplayUrl,
+        int? SlotAUserId,
+        int? SlotBUserId,
+        int? SlotAPoints,
+        int? SlotBPoints,
+        TournamentMatchWinner Winner,
+        string SlotAValue,
+        string SlotBValue,
+        string SlotAOpenLabel,
+        string SlotBOpenLabel);
+
+    private SidePanelSnapshot CaptureSidePanelSnapshot() =>
+        new(
+            editMatchName,
+            editRoundNumber,
+            editStatus,
+            editPlayMode,
+            editReplayUrl,
+            editSlotAUserId,
+            editSlotBUserId,
+            editSlotAPoints,
+            editSlotBPoints,
+            editWinner,
+            slotAValue,
+            slotBValue,
+            editSlotAOpenLabel,
+            editSlotBOpenLabel);
+
+    private TournamentMatch? FindMatchById(int matchId) =>
+        graph?.Matches.FirstOrDefault(m => m.TournamentMatchId == matchId);
+
+    private async Task ApplySidePanelSnapshotAsync(int matchId, SidePanelSnapshot snapshot)
+    {
+        TournamentMatch? match = FindMatchById(matchId);
+        if (match is null)
+        {
+            return;
+        }
+
+        await SaveMatchNameForAsync(match, snapshot.MatchName);
+        match = FindMatchById(matchId);
+        if (match is null)
+        {
+            return;
+        }
+
+        await SaveMatchRoundForAsync(match, snapshot.RoundNumber);
+        match = FindMatchById(matchId);
+        if (match is null)
+        {
+            return;
+        }
+
+        await SaveMatchResultForAsync(match, snapshot);
+        match = FindMatchById(matchId);
+        if (match is null)
+        {
+            return;
+        }
+
+        if (snapshot.SlotAValue == OpenSlotValue)
+        {
+            await SaveSlotOpenLabelForAsync(match, TemplateMatchSlot.A, snapshot.SlotAOpenLabel);
+            match = FindMatchById(matchId);
+        }
+
+        if (match is not null && snapshot.SlotBValue == OpenSlotValue)
+        {
+            await SaveSlotOpenLabelForAsync(match, TemplateMatchSlot.B, snapshot.SlotBOpenLabel);
+        }
+    }
+
+    private IEnumerable<TournamentBracketParticipant> AssignablePlayers(TournamentMatch match)
+    {
+        if (graph is null)
+        {
+            return [];
+        }
+
+        return graph.Participants.Where(p =>
+            p.IsActive || p.UserId == match.SlotAUserId || p.UserId == match.SlotBUserId);
+    }
+
+    private async Task OnTemplateSelectedAsync(int? templateId)
+    {
+        if (templateId is null)
+        {
+            selectedTemplateId = null;
+            return;
+        }
+
+        if (graph?.Matches.Count > 0)
+        {
+            IDialogReference dialog = await DialogService.ShowAsync<ReplaceBracketConfirmDialog>();
+            DialogResult? dialogResult = await dialog.Result;
+            if (dialogResult is null || dialogResult.Canceled)
+            {
+                selectedTemplateId = graph?.Tournament.TournamentTemplateId;
+                return;
+            }
+        }
+
+        Result result = await BracketStore.AssignTemplateAsync(TournamentId, templateId.Value, CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Could not apply template.", Severity.Error);
+            selectedTemplateId = graph?.Tournament.TournamentTemplateId;
+            return;
+        }
+
+        selectedTemplateId = templateId;
+        selectedMatch = null;
+        ShowStatus("Template applied.", Severity.Success);
+        await LoadGraphAsync();
+    }
+
+    private async Task OnEditRoundChangedAsync(int? value)
+    {
+        int? boundId = _boundMatchId;
+        editRoundNumber = value;
+        if (boundId is not int matchId)
+        {
+            return;
+        }
+
+        TournamentMatch? match = FindMatchById(matchId);
+        if (match is null)
+        {
+            return;
+        }
+
+        await SaveMatchRoundForAsync(match, value);
+    }
+
+    private Task OnEditStatusChangedAsync(TournamentMatchStatus value)
+    {
+        editStatus = value;
+        return SaveBoundMatchResultAsync();
+    }
+
+    private Task OnEditPlayModeChangedAsync(TournamentMatchPlayMode value)
+    {
+        editPlayMode = value;
+        return SaveBoundMatchResultAsync();
+    }
+
+    private Task OnEditSlotAUserChangedAsync(int? value)
+    {
+        editSlotAUserId = value;
+        return SaveBoundMatchResultAsync();
+    }
+
+    private Task OnEditSlotBUserChangedAsync(int? value)
+    {
+        editSlotBUserId = value;
+        return SaveBoundMatchResultAsync();
+    }
+
+    private Task OnEditSlotAPointsChangedAsync(int? value)
+    {
+        editSlotAPoints = value;
+        return SaveBoundMatchResultAsync();
+    }
+
+    private Task OnEditSlotBPointsChangedAsync(int? value)
+    {
+        editSlotBPoints = value;
+        return SaveBoundMatchResultAsync();
+    }
+
+    private Task OnEditWinnerChangedAsync(TournamentMatchWinner value)
+    {
+        editWinner = value;
+        return SaveBoundMatchResultAsync();
+    }
+
+    private async Task SaveBoundMatchResultAsync()
+    {
+        if (_boundMatchId is not int matchId)
+        {
+            return;
+        }
+
+        TournamentMatch? match = FindMatchById(matchId);
+        if (match is null)
+        {
+            return;
+        }
+
+        await SaveMatchResultForAsync(match, CaptureSidePanelSnapshot());
+    }
+
+    private TournamentMatch? RefreshMatch(TournamentMatch match) =>
+        graph?.Matches.FirstOrDefault(m => m.TournamentMatchId == match.TournamentMatchId);
+
+    private async Task SaveMatchNameForAsync(TournamentMatch match, string name)
+    {
+        match = RefreshMatch(match) ?? match;
+        string trimmed = name.Trim();
+        string? current = match.Name;
+        if (string.Equals(current?.Trim(), trimmed, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        Result<TournamentMatch> result = await BracketStore.UpdateMatchNameAsync(
+            match.TournamentMatchId,
+            trimmed,
+            match.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Could not save name.", Severity.Error);
+            return;
+        }
+
+        await LoadGraphAsync();
+    }
+
+    private async Task SaveMatchRoundForAsync(TournamentMatch match, int? round)
+    {
+        match = RefreshMatch(match) ?? match;
+        if (round == match.RoundNumber)
+        {
+            return;
+        }
+
+        Result<TournamentMatch> result = await BracketStore.UpdateMatchRoundAsync(
+            match.TournamentMatchId,
+            round,
+            match.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Could not save round.", Severity.Error);
+            return;
+        }
+
+        await LoadGraphAsync();
+    }
+
+    private async Task SaveMatchResultForAsync(TournamentMatch match, SidePanelSnapshot snapshot)
+    {
+        match = RefreshMatch(match) ?? match;
+        if (!HasPendingResultChangesFor(match, snapshot))
+        {
+            return;
+        }
+
+        var update = new TournamentMatchResultUpdate(
+            snapshot.Status,
+            snapshot.PlayMode,
+            snapshot.ReplayUrl,
+            snapshot.SlotAUserId,
+            snapshot.SlotBUserId,
+            snapshot.SlotAPoints,
+            snapshot.SlotBPoints,
+            snapshot.Winner);
+        Result<TournamentMatch> result = await BracketStore.UpdateMatchResultAsync(
+            TournamentId,
+            match.TournamentMatchId,
+            update,
+            match.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Could not save results.", Severity.Error);
+            return;
+        }
+
+        await LoadGraphAsync();
+    }
+
+    private async Task SaveSlotOpenLabelForAsync(TournamentMatch match, TemplateMatchSlot slot, string label)
+    {
+        match = RefreshMatch(match) ?? match;
+        string? current = slot == TemplateMatchSlot.A ? match.SlotAOpenLabel : match.SlotBOpenLabel;
+        string trimmed = label.Trim();
+        if (string.IsNullOrWhiteSpace(current) && string.IsNullOrWhiteSpace(trimmed))
+        {
+            return;
+        }
+
+        if (string.Equals(current?.Trim(), trimmed, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        Result<TournamentMatch> result = await BracketStore.UpdateSlotOpenLabelAsync(
+            match.TournamentMatchId,
+            slot,
+            trimmed,
+            match.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Could not save entrant text.", Severity.Error);
+            return;
+        }
+
+        await LoadGraphAsync();
+    }
+
+    private void ClearFieldFocusMatchIds()
+    {
+        _nameFocusMatchId = null;
+        _replayFocusMatchId = null;
+        _slotAOpenLabelFocusMatchId = null;
+        _slotBOpenLabelFocusMatchId = null;
+    }
+
+    private void OnMatchNameFocus(FocusEventArgs e) =>
+        _nameFocusMatchId = _boundMatchId;
+
+    private void OnReplayUrlFocus(FocusEventArgs e) =>
+        _replayFocusMatchId = _boundMatchId;
+
+    private void OnSlotAOpenLabelFocus(FocusEventArgs e) =>
+        _slotAOpenLabelFocusMatchId = _boundMatchId;
+
+    private void OnSlotBOpenLabelFocus(FocusEventArgs e) =>
+        _slotBOpenLabelFocusMatchId = _boundMatchId;
+
+    private async Task OnMatchNameBlurAsync(FocusEventArgs _)
+    {
+        int? matchId = _nameFocusMatchId;
+        _nameFocusMatchId = null;
+        if (matchId is not int id || id != _boundMatchId)
+        {
+            return;
+        }
+
+        TournamentMatch? match = FindMatchById(id);
+        if (match is null)
+        {
+            return;
+        }
+
+        await SaveMatchNameForAsync(match, editMatchName);
+    }
+
+    private async Task OnReplayUrlBlurAsync(FocusEventArgs _)
+    {
+        int? matchId = _replayFocusMatchId;
+        _replayFocusMatchId = null;
+        if (matchId is not int id || id != _boundMatchId)
+        {
+            return;
+        }
+
+        TournamentMatch? match = FindMatchById(id);
+        if (match is null)
+        {
+            return;
+        }
+
+        await SaveMatchResultForAsync(match, CaptureSidePanelSnapshot());
+    }
+
+    private async Task OnSlotAOpenLabelBlurAsync(FocusEventArgs _)
+    {
+        int? matchId = _slotAOpenLabelFocusMatchId;
+        _slotAOpenLabelFocusMatchId = null;
+        if (matchId is not int id)
+        {
+            return;
+        }
+
+        TournamentMatch? match = graph?.Matches.FirstOrDefault(m => m.TournamentMatchId == id);
+        if (match is null)
+        {
+            return;
+        }
+
+        await SaveSlotOpenLabelForAsync(match, TemplateMatchSlot.A, editSlotAOpenLabel);
+    }
+
+    private async Task OnSlotBOpenLabelBlurAsync(FocusEventArgs _)
+    {
+        int? matchId = _slotBOpenLabelFocusMatchId;
+        _slotBOpenLabelFocusMatchId = null;
+        if (matchId is not int id)
+        {
+            return;
+        }
+
+        TournamentMatch? match = graph?.Matches.FirstOrDefault(m => m.TournamentMatchId == id);
+        if (match is null)
+        {
+            return;
+        }
+
+        await SaveSlotOpenLabelForAsync(match, TemplateMatchSlot.B, editSlotBOpenLabel);
+    }
+
+    private static bool HasPendingResultChangesFor(TournamentMatch match, SidePanelSnapshot snapshot) =>
+        snapshot.Status != match.Status
+        || snapshot.PlayMode != match.PlayMode
+        || !string.Equals(snapshot.ReplayUrl ?? string.Empty, match.ReplayUrl ?? string.Empty, StringComparison.Ordinal)
+        || snapshot.SlotAUserId != match.SlotAUserId
+        || snapshot.SlotBUserId != match.SlotBUserId
+        || snapshot.SlotAPoints != match.SlotAPoints
+        || snapshot.SlotBPoints != match.SlotBPoints
+        || snapshot.Winner != match.Winner;
+
+    private bool IsOutcomeAvailableForSlot(int sourceMatchId, TemplateFeedOutcome outcome, TemplateMatchSlot slot)
+    {
+        if (selectedMatch is null || graph is null)
+        {
+            return false;
+        }
+        TournamentMatchFeed? existing = graph.Feeds.SingleOrDefault(
+            f => f.SourceTournamentMatchId == sourceMatchId && f.SourceOutcome == outcome);
+        if (existing is null)
+        {
+            return true;
+        }
+        return existing.TargetTournamentMatchId == selectedMatch.TournamentMatchId && existing.TargetSlot == slot;
+    }
+
+    private string GetSlotSelectValue(TournamentMatch match, TemplateMatchSlot slot)
+    {
+        TournamentMatchFeed? feed = graph!.Feeds.SingleOrDefault(
+            f => f.TargetTournamentMatchId == match.TournamentMatchId && f.TargetSlot == slot);
+        if (feed is null)
+        {
+            return OpenSlotValue;
+        }
+        return feed.SourceOutcome == TemplateFeedOutcome.Winner
+            ? WinnerSlotValue(feed.SourceTournamentMatchId)
+            : LoserSlotValue(feed.SourceTournamentMatchId);
+    }
+
+    private static string WinnerSlotValue(int sourceMatchId) => $"w:{sourceMatchId}";
+
+    private static string LoserSlotValue(int sourceMatchId) => $"l:{sourceMatchId}";
+
+    private IEnumerable<TournamentMatch> OtherMatches(TournamentMatch match) =>
+        graph!.Matches.Where(m => m.TournamentMatchId != match.TournamentMatchId);
+
+    private static string DisplayName(TournamentMatch match) =>
+        string.IsNullOrWhiteSpace(match.Name) ? $"Match {match.TournamentMatchId}" : match.Name!;
+
+    private string ReplayUrlFieldLabel =>
+        editStatus == TournamentMatchStatus.Finished ? "Replay URL" : "Match URL";
+
+    private string FormatSlot(TournamentMatch match, TemplateMatchSlot slot)
+    {
+        int? userId = slot == TemplateMatchSlot.A ? match.SlotAUserId : match.SlotBUserId;
+        int? points = slot == TemplateMatchSlot.A ? match.SlotAPoints : match.SlotBPoints;
+        if (userId is int uid)
+        {
+            string name = graph!.Participants.FirstOrDefault(p => p.UserId == uid)?.UserName ?? $"User {uid}";
+            string pointsText = points is int p ? $" ({p} pts)" : string.Empty;
+            return $"{name}{pointsText}";
+        }
+
+        TournamentMatchFeed? feed = graph!.Feeds.SingleOrDefault(
+            f => f.TargetTournamentMatchId == match.TournamentMatchId && f.TargetSlot == slot);
+        if (feed is null)
+        {
+            string? label = slot == TemplateMatchSlot.A ? match.SlotAOpenLabel : match.SlotBOpenLabel;
+            return string.IsNullOrWhiteSpace(label) ? "-" : label;
+        }
+        TournamentMatch? source = graph.Matches.SingleOrDefault(m => m.TournamentMatchId == feed.SourceTournamentMatchId);
+        string sourceName = source is null ? "?" : DisplayName(source);
+        return feed.SourceOutcome == TemplateFeedOutcome.Winner
+            ? $"Winner of {sourceName}"
+            : $"Loser of {sourceName}";
+    }
+
+    private string GetSlotLineClass(TournamentMatch match, TemplateMatchSlot slot)
+    {
+        const string baseClass = "slot-line";
+        if (match.Winner == TournamentMatchWinner.SlotA && slot == TemplateMatchSlot.A)
+        {
+            return $"{baseClass} slot-outcome-winner";
+        }
+
+        if (match.Winner == TournamentMatchWinner.SlotB && slot == TemplateMatchSlot.B)
+        {
+            return $"{baseClass} slot-outcome-winner";
+        }
+
+        if (match.Winner == TournamentMatchWinner.SlotA && slot == TemplateMatchSlot.B)
+        {
+            return $"{baseClass} slot-outcome-loser";
+        }
+
+        if (match.Winner == TournamentMatchWinner.SlotB && slot == TemplateMatchSlot.A)
+        {
+            return $"{baseClass} slot-outcome-loser";
+        }
+
+        TournamentMatchFeed? feed = graph!.Feeds.SingleOrDefault(
+            f => f.TargetTournamentMatchId == match.TournamentMatchId && f.TargetSlot == slot);
+        if (feed is null)
+        {
+            return baseClass;
+        }
+
+        return feed.SourceOutcome == TemplateFeedOutcome.Winner
+            ? $"{baseClass} slot-outcome-winner"
+            : $"{baseClass} slot-outcome-loser";
+    }
+
+    private static string GetMatchStatusClass(TournamentMatch match) =>
+        match.Status switch
+        {
+            TournamentMatchStatus.InProgress => "match-status-in-progress",
+            TournamentMatchStatus.Finished => "match-status-finished",
+            _ => string.Empty,
+        };
+
+    private string FormatPlayerSelect(int? userId) =>
+        userId is null
+            ? "-"
+            : graph?.Participants.FirstOrDefault(p => p.UserId == userId)?.UserName ?? $"User {userId}";
+
+    private string FormatStructureSlotSelect(string value)
+    {
+        if (value == OpenSlotValue)
+        {
+            return "Custom entrant";
+        }
+
+        if (TryParseSlotValue(value, out int? sourceId, out TemplateFeedOutcome? outcome) &&
+            sourceId is not null &&
+            outcome is not null &&
+            graph is not null)
+        {
+            TournamentMatch? source = graph.Matches.FirstOrDefault(m => m.TournamentMatchId == sourceId);
+            string sourceName = source is null ? "?" : DisplayName(source);
+            return outcome == TemplateFeedOutcome.Winner
+                ? $"Winner of {sourceName}"
+                : $"Loser of {sourceName}";
+        }
+
+        return value;
+    }
+
+    private (double X, double Y) GetSourceAnchor(int sourceMatchId)
+    {
+        TournamentMatch match = graph!.Matches.Single(m => m.TournamentMatchId == sourceMatchId);
+        double left = GetCellX(match) * CellSize + BoxOffset;
+        double top = GetCellY(match) * CellSize + BoxOffset;
+        return (left + BoxWidth, top + BoxHeight / 2);
+    }
+
+    private (double X, double Y) GetSlotAnchor(int targetMatchId, TemplateMatchSlot slot)
+    {
+        TournamentMatch match = graph!.Matches.Single(m => m.TournamentMatchId == targetMatchId);
+        double left = GetCellX(match) * CellSize + BoxOffset;
+        double top = GetCellY(match) * CellSize + BoxOffset;
+        double slotY = slot == TemplateMatchSlot.A ? top + 28 : top + 56;
+        return (left, slotY);
+    }
+
+    private void StartDrag(PointerEventArgs e, TournamentMatch match)
+    {
+        draggingMatchId = match.TournamentMatchId;
+        dragCellX = match.PositionX;
+        dragCellY = match.PositionY;
+        activePointerId = e.PointerId;
+    }
+
+    private void OnSurfacePointerMove(PointerEventArgs e)
+    {
+        if (draggingMatchId is null || activePointerId != e.PointerId)
+        {
+            return;
+        }
+        int nextX = Math.Max(0, (int)Math.Floor(e.OffsetX / CellSize));
+        int nextY = Math.Max(0, (int)Math.Floor(e.OffsetY / CellSize));
+        if (nextX == dragCellX && nextY == dragCellY)
+        {
+            return;
+        }
+        dragCellX = nextX;
+        dragCellY = nextY;
+        StateHasChanged();
+    }
+
+    private async Task OnSurfacePointerUp(PointerEventArgs e)
+    {
+        if (draggingMatchId is null || activePointerId != e.PointerId)
+        {
+            return;
+        }
+        TournamentMatch? match = graph?.Matches.SingleOrDefault(m => m.TournamentMatchId == draggingMatchId);
+        int savedX = dragCellX;
+        int savedY = dragCellY;
+        draggingMatchId = null;
+        activePointerId = null;
+        if (match is null)
+        {
+            return;
+        }
+        if (match.PositionX == savedX && match.PositionY == savedY)
+        {
+            return;
+        }
+        Result<TournamentMatch> result = await BracketStore.UpdateMatchPositionAsync(
+            match.TournamentMatchId,
+            savedX,
+            savedY,
+            match.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Could not save position.", Severity.Error);
+        }
+        await LoadGraphAsync();
+    }
+
+    private async Task AddMatchAsync()
+    {
+        Result<TournamentMatch> result = await BracketStore.AddMatchAsync(TournamentId, CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Could not add match.", Severity.Error);
+            return;
+        }
+        await LoadGraphAsync();
+        selectedMatch = graph!.Matches.Single(m => m.TournamentMatchId == result.Value!.TournamentMatchId);
+        SyncSidePanel();
+    }
+
+    private async Task OnSlotAChangedAsync(string value) => await SetSlotAsync(TemplateMatchSlot.A, value);
+
+    private async Task OnSlotBChangedAsync(string value) => await SetSlotAsync(TemplateMatchSlot.B, value);
+
+    private async Task SetSlotAsync(TemplateMatchSlot slot, string value)
+    {
+        if (selectedMatch is null)
+        {
+            return;
+        }
+        if (!TryParseSlotValue(value, out int? sourceId, out TemplateFeedOutcome? outcome))
+        {
+            return;
+        }
+        Result result = await BracketStore.SetSlotFeedAsync(
+            selectedMatch.TournamentMatchId,
+            slot,
+            sourceId,
+            outcome,
+            selectedMatch.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Could not update slot.", Severity.Error);
+            SyncSidePanel();
+            return;
+        }
+        await LoadGraphAsync();
+    }
+
+    private static bool TryParseSlotValue(string value, out int? sourceId, out TemplateFeedOutcome? outcome)
+    {
+        sourceId = null;
+        outcome = null;
+        if (value == OpenSlotValue)
+        {
+            return true;
+        }
+        if (value.StartsWith("w:", StringComparison.Ordinal)
+            && int.TryParse(value.AsSpan(2), out int winnerId))
+        {
+            sourceId = winnerId;
+            outcome = TemplateFeedOutcome.Winner;
+            return true;
+        }
+        if (value.StartsWith("l:", StringComparison.Ordinal)
+            && int.TryParse(value.AsSpan(2), out int loserId))
+        {
+            sourceId = loserId;
+            outcome = TemplateFeedOutcome.Loser;
+            return true;
+        }
+        return false;
+    }
+
+    private async Task DeleteSelectedMatchAsync()
+    {
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        if (_boundMatchId is int boundId)
+        {
+            await ApplySidePanelSnapshotAsync(boundId, CaptureSidePanelSnapshot());
+        }
+
+        selectedMatch = FindMatchById(selectedMatch.TournamentMatchId);
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        Result result = await BracketStore.DeleteMatchAsync(
+            selectedMatch.TournamentMatchId,
+            selectedMatch.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Could not delete match.", Severity.Error);
+            return;
+        }
+        selectedMatch = null;
+        await LoadGraphAsync();
+    }
+
+    private void ShowStatus(string message, Severity severity)
+    {
+        statusMessage = message;
+        statusSeverity = severity;
+    }
+
+}
+

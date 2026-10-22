@@ -49,6 +49,7 @@ builder.Services.AddSingleton<PasswordHasher<User>>();
 builder.Services.AddScoped<IUserStore, UserStore>();
 builder.Services.AddScoped<ITournamentStore, TournamentStore>();
 builder.Services.AddScoped<ITournamentTemplateStore, TournamentTemplateStore>();
+builder.Services.AddScoped<ITournamentBracketStore, TournamentBracketStore>();
 var app = builder.Build();
 using (IServiceScope scope = app.Services.CreateScope())
 {

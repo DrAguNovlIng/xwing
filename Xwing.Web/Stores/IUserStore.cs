@@ -20,5 +20,7 @@ public interface IUserStore
         byte[] rowVersion,
         int? forbidRoleChangeForUserId,
         CancellationToken cancellationToken);
-    Task<Result> DeleteAsync(int userId, CancellationToken cancellationToken);
+    Task<Result> DeactivateAsync(int userId, CancellationToken cancellationToken);
+
+    Task<Result> ActivateAsync(int userId, CancellationToken cancellationToken);
 }

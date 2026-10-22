@@ -51,6 +51,12 @@ public sealed class UserStore : IUserStore
         {
             return Result.Fail<UserAccount>("Invalid username or password.");
         }
+
+        if (!user.IsActive)
+        {
+            return Result.Fail<UserAccount>("Invalid username or password.");
+        }
+
         PasswordVerificationResult verification = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
         if (verification is PasswordVerificationResult.Failed)
         {
@@ -113,6 +119,7 @@ public sealed class UserStore : IUserStore
                 UserId = u.UserId,
                 UserName = u.UserName,
                 Role = u.Role,
+                IsActive = u.IsActive,
                 RowVersion = u.RowVersion,
             })
             .ToListAsync(cancellationToken)
@@ -172,7 +179,7 @@ public sealed class UserStore : IUserStore
         return Result.Ok(ToAccount(user));
     }
 
-    public async Task<Result> DeleteAsync(int userId, CancellationToken cancellationToken)
+    public async Task<Result> DeactivateAsync(int userId, CancellationToken cancellationToken)
     {
         await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         User? user = await context.Users
@@ -182,14 +189,41 @@ public sealed class UserStore : IUserStore
         {
             return Result.Fail("User not found.");
         }
-        int adminCount = await context.Users
-            .CountAsync(u => u.Role == UserRoles.Admin, cancellationToken)
-            .ConfigureAwait(false);
-        if (adminCount <= 1 && user.Role == UserRoles.Admin)
+
+        if (!user.IsActive)
         {
-            return Result.Fail("Cannot delete the last admin user.");
+            return Result.Fail("User is already inactive.");
         }
-        context.Users.Remove(user);
+
+        int activeAdminCount = await context.Users
+            .CountAsync(u => u.Role == UserRoles.Admin && u.IsActive, cancellationToken)
+            .ConfigureAwait(false);
+        if (activeAdminCount <= 1 && user.Role == UserRoles.Admin)
+        {
+            return Result.Fail("Cannot deactivate the last active admin user.");
+        }
+
+        user.IsActive = false;
+        return await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<Result> ActivateAsync(int userId, CancellationToken cancellationToken)
+    {
+        await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        User? user = await context.Users
+            .SingleOrDefaultAsync(u => u.UserId == userId, cancellationToken)
+            .ConfigureAwait(false);
+        if (user is null)
+        {
+            return Result.Fail("User not found.");
+        }
+
+        if (user.IsActive)
+        {
+            return Result.Fail("User is already active.");
+        }
+
+        user.IsActive = true;
         return await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
     }
 
@@ -199,6 +233,7 @@ public sealed class UserStore : IUserStore
             UserId = user.UserId,
             UserName = user.UserName,
             Role = user.Role,
+            IsActive = user.IsActive,
             RowVersion = user.RowVersion,
         };
 }

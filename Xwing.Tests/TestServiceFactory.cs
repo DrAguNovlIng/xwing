@@ -14,10 +14,12 @@ internal static class TestServiceFactory
         var contextFactory = new TestDbContextFactory(connectionString, clock);
         var concurrencyHelpers = new StoreConcurrencyHelpers(NullLogger<StoreConcurrencyHelpers>.Instance);
         var passwordHasher = new PasswordHasher<User>();
+        var templateStore = new TournamentTemplateStore(contextFactory, concurrencyHelpers);
         return new TestStores(
             new TournamentStore(contextFactory, concurrencyHelpers, clock),
             new UserStore(contextFactory, concurrencyHelpers, passwordHasher),
-            new TournamentTemplateStore(contextFactory, concurrencyHelpers));
+            templateStore,
+            new TournamentBracketStore(contextFactory, templateStore, concurrencyHelpers));
     }
 
     public static async Task<TestStores> CreateStoresWithResetAsync(
@@ -33,6 +35,8 @@ internal static class TestServiceFactory
     {
         var factory = new TestDbContextFactory(connectionString, TimeProvider.System);
         await using XwingDbContext db = await factory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        await db.TournamentMatchFeeds.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+        await db.TournamentMatches.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
         await db.TemplateMatchFeeds.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
         await db.TemplateMatches.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
         await db.TournamentTemplates.ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);

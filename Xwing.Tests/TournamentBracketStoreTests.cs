@@ -1,0 +1,162 @@
+using Xwing.Web.Data;
+using Xwing.Web.Models;
+using Xwing.Web.Stores;
+
+namespace Xwing.Tests;
+
+[Collection("SQL Server Integration Tests")]
+public sealed class TournamentBracketStoreTests
+{
+    private readonly string connectionString;
+
+    private static readonly DateTimeOffset DefaultStart = new(2026, 11, 1, 0, 0, 0, TimeSpan.Zero);
+
+    private static readonly DateTimeOffset DefaultEnd = new(2026, 11, 5, 0, 0, 0, TimeSpan.Zero);
+
+    public TournamentBracketStoreTests(SqlServerFixture fixture)
+    {
+        ArgumentNullException.ThrowIfNull(fixture);
+        connectionString = fixture.ConnectionString;
+    }
+
+    [Fact]
+    public async Task AssignTemplateShouldCopyRoundAndFeeds()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<TournamentTemplate> template = await stores.Templates.CreateAsync(
+                "Swiss",
+                TestContext.Current.CancellationToken);
+            Result<TemplateMatch> match = await stores.Templates.AddMatchAsync(
+                template.Value!.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            await stores.Templates.UpdateMatchRoundAsync(
+                match.Value!.TemplateMatchId,
+                2,
+                match.Value.RowVersion,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+                "Event",
+                DefaultStart,
+                DefaultEnd,
+                TestContext.Current.CancellationToken);
+            Result assigned = await stores.Brackets.AssignTemplateAsync(
+                tournament.Value!.TournamentId,
+                template.Value.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            assigned.IsSuccess.ShouldBeTrue();
+            Result<TournamentBracketGraph> graph = await stores.Brackets.GetGraphAsync(
+                tournament.Value.TournamentId,
+                TestContext.Current.CancellationToken);
+            graph.IsSuccess.ShouldBeTrue();
+            graph.Value!.Matches.Single().RoundNumber.ShouldBe(2);
+            graph.Value.Matches.Single().Status.ShouldBe(TournamentMatchStatus.NotStarted);
+        }
+    }
+
+    [Fact]
+    public async Task UpdateMatchResultShouldRejectWinnerWithoutPlayer()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<TournamentTemplate> template = await stores.Templates.CreateAsync(
+                "Final",
+                TestContext.Current.CancellationToken);
+            await stores.Templates.AddMatchAsync(
+                template.Value!.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+                "Event",
+                DefaultStart,
+                DefaultEnd,
+                TestContext.Current.CancellationToken);
+            await stores.Brackets.AssignTemplateAsync(
+                tournament.Value!.TournamentId,
+                template.Value.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            Result<TournamentBracketGraph> graph = await stores.Brackets.GetGraphAsync(
+                tournament.Value.TournamentId,
+                TestContext.Current.CancellationToken);
+            TournamentMatch match = graph.Value!.Matches.Single();
+            var update = new TournamentMatchResultUpdate(
+                TournamentMatchStatus.Finished,
+                TournamentMatchPlayMode.Offline,
+                null,
+                null,
+                null,
+                null,
+                null,
+                TournamentMatchWinner.SlotA);
+            Result<TournamentMatch> saved = await stores.Brackets.UpdateMatchResultAsync(
+                tournament.Value.TournamentId,
+                match.TournamentMatchId,
+                update,
+                match.RowVersion,
+                TestContext.Current.CancellationToken);
+            saved.IsSuccess.ShouldBeFalse();
+        }
+    }
+
+    [Fact]
+    public async Task UpdateMatchResultShouldAcceptValidResult()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<UserAccount> player = await stores.Users.CreateAsync(
+                "bracket-player",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            Result<TournamentTemplate> template = await stores.Templates.CreateAsync(
+                "Final",
+                TestContext.Current.CancellationToken);
+            await stores.Templates.AddMatchAsync(
+                template.Value!.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+                "Event",
+                DefaultStart,
+                DefaultEnd,
+                TestContext.Current.CancellationToken);
+            await stores.Tournaments.JoinAsync(
+                tournament.Value!.TournamentId,
+                player.Value!.UserId,
+                TestContext.Current.CancellationToken);
+            await stores.Brackets.AssignTemplateAsync(
+                tournament.Value.TournamentId,
+                template.Value.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            Result<TournamentBracketGraph> graph = await stores.Brackets.GetGraphAsync(
+                tournament.Value.TournamentId,
+                TestContext.Current.CancellationToken);
+            TournamentMatch match = graph.Value!.Matches.Single();
+            var update = new TournamentMatchResultUpdate(
+                TournamentMatchStatus.InProgress,
+                TournamentMatchPlayMode.Online,
+                "https://example.com/replay",
+                player.Value.UserId,
+                null,
+                3,
+                null,
+                TournamentMatchWinner.SlotA);
+            Result<TournamentMatch> saved = await stores.Brackets.UpdateMatchResultAsync(
+                tournament.Value.TournamentId,
+                match.TournamentMatchId,
+                update,
+                match.RowVersion,
+                TestContext.Current.CancellationToken);
+            saved.IsSuccess.ShouldBeTrue();
+            saved.Value!.Status.ShouldBe(TournamentMatchStatus.InProgress);
+            saved.Value.SlotAPoints.ShouldBe(3);
+        }
+    }
+}

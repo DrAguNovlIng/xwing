@@ -1,0 +1,255 @@
+@page "/tournaments/{TournamentId:int}/results"
+
+@attribute [Authorize]
+
+@using Xwing.Web.Data
+@using Xwing.Web.Models
+@using Xwing.Web.Stores
+@inject ITournamentBracketStore BracketStore
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>@pageTitle</PageTitle>
+
+<MudStack Spacing="2">
+    <MudToolBar Gutters="false" WrapContent="true">
+        <MudButton StartIcon="@Icons.Material.Filled.ArrowBack"
+                   Variant="Variant.Text"
+                   OnClick="@(() => Navigation.NavigateTo($"/tournaments/{TournamentId}"))">
+            Tournament
+        </MudButton>
+        <MudSpacer />
+        @if (isAdmin)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="@($"/tournaments/{TournamentId}/edit")">
+                Edit results
+            </MudButton>
+        }
+    </MudToolBar>
+    <MudText Typo="Typo.h5">@pageTitle</MudText>
+    @if (loading)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (graph is null)
+    {
+        <MudText>Tournament not found.</MudText>
+    }
+    else if (graph.Matches.Count == 0)
+    {
+        <MudText>No bracket has been set up for this tournament yet.</MudText>
+    }
+    else
+    {
+        <div class="template-graph-surface" style="@SurfaceStyle">
+            <svg class="template-graph-edges" width="@surfaceWidth" height="@surfaceHeight" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <marker id="results-edge-winner" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+                        <path d="M0,0 L8,4 L0,8 Z" fill="var(--mud-palette-success)" />
+                    </marker>
+                    <marker id="results-edge-loser" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+                        <path d="M0,0 L8,4 L0,8 Z" fill="var(--mud-palette-warning)" />
+                    </marker>
+                </defs>
+                @foreach (TournamentMatchFeed feed in graph.Feeds)
+                {
+                    (double x1, double y1) = GetSourceAnchor(feed.SourceTournamentMatchId);
+                    (double x2, double y2) = GetSlotAnchor(feed.TargetTournamentMatchId, feed.TargetSlot);
+                    bool isWinner = feed.SourceOutcome == TemplateFeedOutcome.Winner;
+                    string strokeColor = isWinner ? "var(--mud-palette-success)" : "var(--mud-palette-warning)";
+                    string markerEnd = isWinner ? "url(#results-edge-winner)" : "url(#results-edge-loser)";
+                    <line x1="@x1.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                          y1="@y1.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                          x2="@x2.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                          y2="@y2.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                          stroke="@strokeColor"
+                          stroke-width="2.5"
+                          marker-end="@markerEnd" />
+                }
+            </svg>
+            @foreach (TournamentMatch match in graph.Matches)
+            {
+                <div class="template-match-box @GetMatchStatusClass(match)" style="@GetBoxStyle(match.PositionX, match.PositionY)">
+                    <div class="template-match-box-header">
+                        <MudText Typo="Typo.subtitle2">@DisplayName(match)</MudText>
+                        @if (match.PlayMode == TournamentMatchPlayMode.Online)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Info">Online</MudChip>
+                        }
+                    </div>
+                    @if (match.RoundNumber is not null || !string.IsNullOrEmpty(match.ReplayUrl))
+                    {
+                        <div class="template-match-box-meta">
+                            @if (match.RoundNumber is int roundNum)
+                            {
+                                <MudText Typo="Typo.caption">Round @roundNum</MudText>
+                            }
+                            @if (!string.IsNullOrEmpty(match.ReplayUrl))
+                            {
+                                <MudLink Href="@match.ReplayUrl"
+                                         Target="_blank"
+                                         Typo="Typo.caption"
+                                         Class="template-match-box-meta-link">@GetReplayLinkLabel(match)</MudLink>
+                            }
+                        </div>
+                    }
+                    <MudText Typo="Typo.caption" Class="@GetSlotLineClass(match, TemplateMatchSlot.A)">A: @FormatSlot(match, TemplateMatchSlot.A)</MudText>
+                    <MudText Typo="Typo.caption" Class="@GetSlotLineClass(match, TemplateMatchSlot.B)">B: @FormatSlot(match, TemplateMatchSlot.B)</MudText>
+                </div>
+            }
+        </div>
+    }
+</MudStack>
+
+@code {
+    private const int CellSize = 40;
+    private const int BoxOffset = 6;
+    private const int BoxWidth = 168;
+    private const int BoxHeight = 88;
+    private const int MinSurfaceCells = 30;
+
+    [Parameter]
+    public int TournamentId { get; set; }
+
+    private TournamentBracketGraph? graph;
+
+    private string pageTitle = "Results";
+
+    private bool loading = true;
+
+    private bool isAdmin;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAdmin = authState.User.IsInRole(UserRoles.Admin);
+        Result<TournamentBracketGraph> result = await BracketStore.GetGraphAsync(TournamentId, CancellationToken.None);
+        graph = result.IsSuccess ? result.Value : null;
+        pageTitle = graph is null ? "Results" : $"{graph.Tournament.Name} — Results";
+        loading = false;
+    }
+
+    private int surfaceWidth => ComputeSurfaceWidth();
+
+    private int surfaceHeight => ComputeSurfaceHeight();
+
+    private string SurfaceStyle => $"width: {surfaceWidth}px; height: {surfaceHeight}px; min-width: 100%;";
+
+    private int ComputeSurfaceWidth()
+    {
+        if (graph is null || graph.Matches.Count == 0)
+        {
+            return CellSize * MinSurfaceCells;
+        }
+
+        int maxRight = graph.Matches.Max(m => m.PositionX * CellSize + BoxOffset + BoxWidth);
+        return Math.Max(CellSize * MinSurfaceCells, maxRight + CellSize * 2);
+    }
+
+    private int ComputeSurfaceHeight()
+    {
+        if (graph is null || graph.Matches.Count == 0)
+        {
+            return CellSize * MinSurfaceCells;
+        }
+
+        int maxBottom = graph.Matches.Max(m => m.PositionY * CellSize + BoxOffset + BoxHeight);
+        return Math.Max(CellSize * MinSurfaceCells, maxBottom + CellSize * 2);
+    }
+
+    private static string GetBoxStyle(int cellX, int cellY) =>
+        $"left: {cellX * CellSize + BoxOffset}px; top: {cellY * CellSize + BoxOffset}px;";
+
+    private static string DisplayName(TournamentMatch match) =>
+        string.IsNullOrWhiteSpace(match.Name) ? $"Match {match.TournamentMatchId}" : match.Name!;
+
+    private static string GetReplayLinkLabel(TournamentMatch match) =>
+        match.Status == TournamentMatchStatus.Finished ? "Replay" : "Match";
+
+    private static string GetMatchStatusClass(TournamentMatch match) =>
+        match.Status switch
+        {
+            TournamentMatchStatus.InProgress => "match-status-in-progress",
+            TournamentMatchStatus.Finished => "match-status-finished",
+            _ => string.Empty,
+        };
+
+    private string FormatSlot(TournamentMatch match, TemplateMatchSlot slot)
+    {
+        int? userId = slot == TemplateMatchSlot.A ? match.SlotAUserId : match.SlotBUserId;
+        int? points = slot == TemplateMatchSlot.A ? match.SlotAPoints : match.SlotBPoints;
+        if (userId is int uid)
+        {
+            string name = graph!.Participants.FirstOrDefault(p => p.UserId == uid)?.UserName ?? $"User {uid}";
+            string pointsText = points is int p ? $" ({p} pts)" : string.Empty;
+            return $"{name}{pointsText}";
+        }
+
+        TournamentMatchFeed? feed = graph!.Feeds.SingleOrDefault(
+            f => f.TargetTournamentMatchId == match.TournamentMatchId && f.TargetSlot == slot);
+        if (feed is null)
+        {
+            string? label = slot == TemplateMatchSlot.A ? match.SlotAOpenLabel : match.SlotBOpenLabel;
+            return string.IsNullOrWhiteSpace(label) ? "—" : label;
+        }
+
+        TournamentMatch? source = graph.Matches.SingleOrDefault(m => m.TournamentMatchId == feed.SourceTournamentMatchId);
+        string sourceName = source is null ? "?" : DisplayName(source);
+        return feed.SourceOutcome == TemplateFeedOutcome.Winner
+            ? $"Winner of {sourceName}"
+            : $"Loser of {sourceName}";
+    }
+
+    private string GetSlotLineClass(TournamentMatch match, TemplateMatchSlot slot)
+    {
+        const string baseClass = "slot-line";
+        if (match.Winner == TournamentMatchWinner.SlotA && slot == TemplateMatchSlot.A)
+        {
+            return $"{baseClass} slot-outcome-winner";
+        }
+
+        if (match.Winner == TournamentMatchWinner.SlotB && slot == TemplateMatchSlot.B)
+        {
+            return $"{baseClass} slot-outcome-winner";
+        }
+
+        if (match.Winner == TournamentMatchWinner.SlotA && slot == TemplateMatchSlot.B)
+        {
+            return $"{baseClass} slot-outcome-loser";
+        }
+
+        if (match.Winner == TournamentMatchWinner.SlotB && slot == TemplateMatchSlot.A)
+        {
+            return $"{baseClass} slot-outcome-loser";
+        }
+
+        TournamentMatchFeed? feed = graph!.Feeds.SingleOrDefault(
+            f => f.TargetTournamentMatchId == match.TournamentMatchId && f.TargetSlot == slot);
+        if (feed is null)
+        {
+            return baseClass;
+        }
+
+        return feed.SourceOutcome == TemplateFeedOutcome.Winner
+            ? $"{baseClass} slot-outcome-winner"
+            : $"{baseClass} slot-outcome-loser";
+    }
+
+    private (double X, double Y) GetSourceAnchor(int sourceMatchId)
+    {
+        TournamentMatch match = graph!.Matches.Single(m => m.TournamentMatchId == sourceMatchId);
+        double left = match.PositionX * CellSize + BoxOffset;
+        double top = match.PositionY * CellSize + BoxOffset;
+        return (left + BoxWidth, top + BoxHeight / 2);
+    }
+
+    private (double X, double Y) GetSlotAnchor(int targetMatchId, TemplateMatchSlot slot)
+    {
+        TournamentMatch match = graph!.Matches.Single(m => m.TournamentMatchId == targetMatchId);
+        double left = match.PositionX * CellSize + BoxOffset;
+        double top = match.PositionY * CellSize + BoxOffset;
+        double slotY = slot == TemplateMatchSlot.A ? top + 28 : top + 56;
+        return (left, slotY);
+    }
+}

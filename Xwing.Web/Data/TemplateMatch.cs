@@ -32,6 +32,8 @@ public sealed class TemplateMatch : BaseModel
 
     public string? SlotBOpenLabel { get; set; }
 
+    public int? RoundNumber { get; set; }
+
     public ICollection<TemplateMatchFeed> IncomingFeeds { get; } = [];
 
     public ICollection<TemplateMatchFeed> OutgoingFeeds { get; } = [];

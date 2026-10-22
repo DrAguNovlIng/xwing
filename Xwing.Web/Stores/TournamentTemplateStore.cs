@@ -328,7 +328,7 @@ public sealed class TournamentTemplateStore : ITournamentTemplateStore
             .Select(f => (f.SourceTemplateMatchId, f.TargetTemplateMatchId))
             .ToList();
         edges.Add((sourceTemplateMatchId.Value, targetTemplateMatchId));
-        if (WouldCreateCycle(sourceTemplateMatchId.Value, targetTemplateMatchId, edges))
+        if (MatchFeedCycleHelper.WouldCreateCycle(sourceTemplateMatchId.Value, targetTemplateMatchId, edges))
         {
             return Result.Fail("That connection would create a cycle.");
         }
@@ -407,44 +407,34 @@ public sealed class TournamentTemplateStore : ITournamentTemplateStore
         }
     }
 
-    private static bool WouldCreateCycle(int sourceMatchId, int targetMatchId, IReadOnlyList<(int Source, int Target)> edges)
+    public async Task<Result<TemplateMatch>> UpdateMatchRoundAsync(
+        int templateMatchId,
+        int? roundNumber,
+        byte[] rowVersion,
+        CancellationToken cancellationToken)
     {
-        if (sourceMatchId == targetMatchId)
+        if (roundNumber is < 1)
         {
-            return true;
+            return Result.Fail<TemplateMatch>("Round must be at least 1.");
         }
-        Dictionary<int, List<int>> adjacency = [];
-        foreach ((int source, int target) in edges)
+
+        await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        TemplateMatch? match = await context.TemplateMatches
+            .SingleOrDefaultAsync(m => m.TemplateMatchId == templateMatchId, cancellationToken)
+            .ConfigureAwait(false);
+        if (match is null)
         {
-            if (!adjacency.TryGetValue(source, out List<int>? targets))
-            {
-                targets = [];
-                adjacency[source] = targets;
-            }
-            targets.Add(target);
+            return Result.Fail<TemplateMatch>("Match not found.");
         }
-        var stack = new Stack<int>();
-        stack.Push(targetMatchId);
-        var visited = new HashSet<int>();
-        while (stack.Count > 0)
+
+        match.RoundNumber = roundNumber;
+        context.Entry(match).Property(e => e.RowVersion).OriginalValue = rowVersion;
+        Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
+        if (!saveResult.IsSuccess)
         {
-            int node = stack.Pop();
-            if (node == sourceMatchId)
-            {
-                return true;
-            }
-            if (!visited.Add(node))
-            {
-                continue;
-            }
-            if (adjacency.TryGetValue(node, out List<int>? next))
-            {
-                foreach (int child in next)
-                {
-                    stack.Push(child);
-                }
-            }
+            return Result.Fail<TemplateMatch>(saveResult.Error!);
         }
-        return false;
+
+        return Result.Ok(match);
     }
 }

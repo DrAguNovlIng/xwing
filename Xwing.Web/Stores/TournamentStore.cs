@@ -317,13 +317,18 @@ public sealed class TournamentStore : ITournamentStore
         {
             return rosterWindow;
         }
-        bool userExists = await context.Users
+        User? user = await context.Users
             .AsNoTracking()
-            .AnyAsync(u => u.UserId == userId, cancellationToken)
+            .SingleOrDefaultAsync(u => u.UserId == userId, cancellationToken)
             .ConfigureAwait(false);
-        if (!userExists)
+        if (user is null)
         {
             return Result.Fail("User not found.");
+        }
+
+        if (!user.IsActive)
+        {
+            return Result.Fail("This account is inactive.");
         }
         bool alreadyJoined = await context.TournamentParticipants
             .AsNoTracking()

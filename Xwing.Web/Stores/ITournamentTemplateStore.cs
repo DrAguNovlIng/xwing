@@ -68,7 +68,15 @@ public interface ITournamentTemplateStore
 
         CancellationToken cancellationToken);
 
+    Task<Result<TemplateMatch>> UpdateMatchRoundAsync(
 
+        int templateMatchId,
+
+        int? roundNumber,
+
+        byte[] rowVersion,
+
+        CancellationToken cancellationToken);
 
     Task<Result> DeleteMatchAsync(int templateMatchId, byte[] rowVersion, CancellationToken cancellationToken);
 

@@ -1,0 +1,23 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Replace bracket?</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText>
+            Applying a template will replace the current bracket and all entered results.
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="Confirm">Replace</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Confirm() => MudDialog.Close(DialogResult.Ok(true));
+}

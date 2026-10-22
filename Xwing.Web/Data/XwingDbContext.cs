@@ -25,6 +25,10 @@ public sealed class XwingDbContext : DbContext
 
     public DbSet<TemplateMatchFeed> TemplateMatchFeeds => Set<TemplateMatchFeed>();
 
+    public DbSet<TournamentMatch> TournamentMatches => Set<TournamentMatch>();
+
+    public DbSet<TournamentMatchFeed> TournamentMatchFeeds => Set<TournamentMatchFeed>();
+
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         StampTimes();
@@ -52,6 +56,10 @@ public sealed class XwingDbContext : DbContext
             entity.Property(e => e.EndDateUtc).HasColumnType("datetimeoffset");
             entity.Property(e => e.TimeCreatedUtc).HasColumnType("datetimeoffset");
             entity.Property(e => e.TimeUpdatedUtc).HasColumnType("datetimeoffset");
+            entity.HasOne(e => e.TournamentTemplate)
+                .WithMany()
+                .HasForeignKey(e => e.TournamentTemplateId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
         modelBuilder.Entity<User>(entity =>
         {
@@ -62,6 +70,7 @@ public sealed class XwingDbContext : DbContext
             entity.HasIndex(e => e.UserName).IsUnique();
             entity.Property(e => e.PasswordHash).HasMaxLength(500).IsRequired();
             entity.Property(e => e.Role).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.TimeCreatedUtc).HasColumnType("datetimeoffset");
             entity.Property(e => e.TimeUpdatedUtc).HasColumnType("datetimeoffset");
         });
@@ -110,6 +119,55 @@ public sealed class XwingDbContext : DbContext
                 .WithMany(t => t.Matches)
                 .HasForeignKey(e => e.TournamentTemplateId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TournamentMatch>(entity =>
+        {
+            entity.ToTable("TournamentMatches");
+            entity.HasKey(e => e.TournamentMatchId);
+            entity.Property(e => e.TournamentMatchId).UseIdentityColumn();
+            entity.Property(e => e.Name).HasMaxLength(200);
+            entity.Property(e => e.SlotAOpenLabel).HasMaxLength(200);
+            entity.Property(e => e.SlotBOpenLabel).HasMaxLength(200);
+            entity.Property(e => e.ReplayUrl).HasMaxLength(2000);
+            entity.Property(e => e.Status).HasConversion<int>();
+            entity.Property(e => e.PlayMode).HasConversion<int>();
+            entity.Property(e => e.Winner).HasConversion<int>();
+            entity.Property(e => e.TimeCreatedUtc).HasColumnType("datetimeoffset");
+            entity.Property(e => e.TimeUpdatedUtc).HasColumnType("datetimeoffset");
+            entity.HasOne(e => e.Tournament)
+                .WithMany()
+                .HasForeignKey(e => e.TournamentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.SlotAUser)
+                .WithMany()
+                .HasForeignKey(e => e.SlotAUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.SlotBUser)
+                .WithMany()
+                .HasForeignKey(e => e.SlotBUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<TournamentMatchFeed>(entity =>
+        {
+            entity.ToTable("TournamentMatchFeeds");
+            entity.HasKey(e => e.TournamentMatchFeedId);
+            entity.Property(e => e.TournamentMatchFeedId).UseIdentityColumn();
+            entity.Property(e => e.TargetSlot).HasConversion<int>();
+            entity.Property(e => e.SourceOutcome).HasConversion<int>();
+            entity.Property(e => e.TimeCreatedUtc).HasColumnType("datetimeoffset");
+            entity.Property(e => e.TimeUpdatedUtc).HasColumnType("datetimeoffset");
+            entity.HasIndex(e => new { e.TargetTournamentMatchId, e.TargetSlot }).IsUnique();
+            entity.HasIndex(e => new { e.SourceTournamentMatchId, e.SourceOutcome }).IsUnique();
+            entity.HasOne(e => e.TargetMatch)
+                .WithMany(m => m.IncomingFeeds)
+                .HasForeignKey(e => e.TargetTournamentMatchId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.SourceMatch)
+                .WithMany(m => m.OutgoingFeeds)
+                .HasForeignKey(e => e.SourceTournamentMatchId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<TemplateMatchFeed>(entity =>

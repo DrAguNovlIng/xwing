@@ -58,14 +58,23 @@ else if (isAdmin)
         <HeaderContent>
             <MudTh>Username</MudTh>
             <MudTh>Role</MudTh>
-            <MudTh Style="width: 12rem;">Actions</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh Style="width: 14rem;">Actions</MudTh>
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="Username">@context.UserName</MudTd>
             <MudTd DataLabel="Role">@context.Role</MudTd>
+            <MudTd DataLabel="Status">@(context.IsActive ? "Active" : "Inactive")</MudTd>
             <MudTd>
                 <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => OpenEditDialogAsync(context))">Edit</MudButton>
-                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error" OnClick="@(() => DeleteUserAsync(context.UserId))">Delete</MudButton>
+                @if (context.IsActive)
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error" OnClick="@(() => DeactivateUserAsync(context.UserId))">Deactivate</MudButton>
+                }
+                else
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => ActivateUserAsync(context.UserId))">Activate</MudButton>
+                }
             </MudTd>
         </RowTemplate>
     </MudTable>
@@ -170,15 +179,27 @@ else if (isAdmin)
         await ReloadUsersAsync();
     }
 
-    private async Task DeleteUserAsync(int userId)
+    private async Task DeactivateUserAsync(int userId)
     {
-        Result result = await UserStore.DeleteAsync(userId, CancellationToken.None);
+        Result result = await UserStore.DeactivateAsync(userId, CancellationToken.None);
         if (!result.IsSuccess)
         {
             ShowStatus(result.Error!, Severity.Error);
             return;
         }
-        ShowStatus("User deleted.", Severity.Success);
+        ShowStatus("User deactivated.", Severity.Success);
+        await ReloadUsersAsync();
+    }
+
+    private async Task ActivateUserAsync(int userId)
+    {
+        Result result = await UserStore.ActivateAsync(userId, CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error!, Severity.Error);
+            return;
+        }
+        ShowStatus("User activated.", Severity.Success);
         await ReloadUsersAsync();
     }
 

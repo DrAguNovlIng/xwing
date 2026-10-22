@@ -586,7 +586,7 @@ public sealed class TournamentStoreTests
     }
 
     [Fact]
-    public async Task DeleteUserShouldSucceedWhenParticipantExists()
+    public async Task DeactivateUserShouldKeepParticipantWhenInTournament()
     {
         DateTimeOffset today = new(2026, 10, 15, 0, 0, 0, TimeSpan.Zero);
         var timeProvider = new FixedTimeProvider(today);
@@ -616,10 +616,14 @@ public sealed class TournamentStoreTests
                 tournament.Value!.TournamentId,
                 user.Value!.UserId,
                 TestContext.Current.CancellationToken);
-            Result deleted = await stores.Users.DeleteAsync(
+            Result deactivated = await stores.Users.DeactivateAsync(
                 user.Value.UserId,
                 TestContext.Current.CancellationToken);
-            deleted.IsSuccess.ShouldBeTrue();
+            deactivated.IsSuccess.ShouldBeTrue();
+            IReadOnlyList<TournamentMember> membersAfter = await stores.Tournaments.ListMembersAsync(
+                tournament.Value!.TournamentId,
+                TestContext.Current.CancellationToken);
+            membersAfter.Any(m => m.UserId == user.Value.UserId).ShouldBeTrue();
         }
     }
 

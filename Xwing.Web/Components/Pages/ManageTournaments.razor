@@ -40,6 +40,7 @@
         <MudTd DataLabel="End">@FormatDate(context.Tournament.EndDateUtc)</MudTd>
         <MudTd>
             <MudButton Size="Size.Small" Variant="Variant.Text" Href="@($"/tournaments/{context.Tournament.TournamentId}")">Open</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Text" Href="@($"/tournaments/{context.Tournament.TournamentId}/edit")">Edit results</MudButton>
             <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => OpenEditDialogAsync(context.Tournament))">Edit</MudButton>
             <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error" OnClick="@(() => DeleteAsync(context.Tournament.TournamentId))">Delete</MudButton>
         </MudTd>

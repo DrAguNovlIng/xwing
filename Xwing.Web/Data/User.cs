@@ -8,4 +8,6 @@ public sealed class User : BaseModel
     public string PasswordHash { get; set; } = string.Empty;
 
     public string Role { get; set; } = UserRoles.Member;
+
+    public bool IsActive { get; set; } = true;
 }

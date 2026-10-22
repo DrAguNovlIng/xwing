@@ -40,10 +40,15 @@ else
         <MudAlert Severity="@statusSeverity" Class="mb-4" Dense="true">@statusMessage</MudAlert>
     }
     <MudText Typo="Typo.h4" Class="mb-2">@tournament.Name</MudText>
-    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="mb-4" Wrap="Wrap.Wrap">
         <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(tournament)">@GetStatusLabel(tournament)</MudChip>
         <MudText Typo="Typo.body2">Start: @FormatDate(tournament.StartDateUtc)</MudText>
         <MudText Typo="Typo.body2">End: @FormatDate(tournament.EndDateUtc)</MudText>
+        <MudButton Variant="Variant.Outlined" Size="Size.Small" Href="@($"/tournaments/{TournamentId}/results")">Results</MudButton>
+        @if (isAdmin)
+        {
+            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" Href="@($"/tournaments/{TournamentId}/edit")">Edit results</MudButton>
+        }
     </MudStack>
     @if (!string.IsNullOrEmpty(joinTimeLeftLabel))
     {
@@ -151,6 +156,8 @@ else
 
     private int? currentUserId;
 
+    private bool isAdmin;
+
     private DateTimeOffset todayUtc;
 
     private string? statusMessage;
@@ -178,6 +185,7 @@ else
         AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync().ConfigureAwait(false);
         string? idClaim = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
         currentUserId = int.TryParse(idClaim, CultureInfo.InvariantCulture, out int parsedId) ? parsedId : null;
+        isAdmin = authState.User.IsInRole(UserRoles.Admin);
         tournament = await TournamentStore.GetAsync(TournamentId, CancellationToken.None).ConfigureAwait(false);
         if (tournament is not null)
         {

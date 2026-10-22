@@ -45,6 +45,7 @@
         <MudTh>Status</MudTh>
         <MudTh><MudTableSortLabel T="TournamentListItem" SortLabel="Start" InitialDirection="SortDirection.Ascending">Start</MudTableSortLabel></MudTh>
         <MudTh><MudTableSortLabel T="TournamentListItem" SortLabel="End">End</MudTableSortLabel></MudTh>
+        <MudTh>Results</MudTh>
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="Name">
@@ -56,6 +57,9 @@
         </MudTd>
         <MudTd DataLabel="Start">@FormatDate(context.Tournament.StartDateUtc)</MudTd>
         <MudTd DataLabel="End">@FormatDate(context.Tournament.EndDateUtc)</MudTd>
+        <MudTd DataLabel="Results">
+            <MudLink Href="@($"/tournaments/{context.Tournament.TournamentId}/results")" Underline="Underline.Hover">Results</MudLink>
+        </MudTd>
     </RowTemplate>
     <NoRecordsContent>
         <MudText>No tournaments match your search.</MudText>

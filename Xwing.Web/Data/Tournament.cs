@@ -7,4 +7,8 @@ public sealed class Tournament : BaseModel
 
     public DateTimeOffset StartDateUtc { get; set; }
     public DateTimeOffset EndDateUtc { get; set; }
+
+    public int? TournamentTemplateId { get; set; }
+
+    public TournamentTemplate? TournamentTemplate { get; set; }
 }

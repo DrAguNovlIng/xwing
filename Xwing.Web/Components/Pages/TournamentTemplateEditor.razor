@@ -131,9 +131,22 @@
                         <MudButton Variant="Variant.Outlined"
                                    Color="Color.Primary"
                                    FullWidth="true"
-                                   Class="mb-4"
+                                   Class="mb-2"
                                    OnClick="SaveMatchNameAsync">
                             Save name
+                        </MudButton>
+                        <MudNumericField T="int?"
+                                         @bind-Value="editRoundNumber"
+                                         Label="Round"
+                                         Variant="Variant.Outlined"
+                                         Min="1"
+                                         Class="mb-2" />
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   FullWidth="true"
+                                   Class="mb-4"
+                                   OnClick="SaveMatchRoundAsync">
+                            Save round
                         </MudButton>
                         <MudSelect T="string"
                                    Label="Slot A"
@@ -307,6 +320,8 @@
 
     private string editSlotBOpenLabel = string.Empty;
 
+    private int? editRoundNumber;
+
     private string pageTitle = "Template";
 
     private string? statusMessage;
@@ -406,6 +421,28 @@
         slotBValue = GetSlotSelectValue(selectedMatch, TemplateMatchSlot.B);
         editSlotAOpenLabel = selectedMatch.SlotAOpenLabel ?? string.Empty;
         editSlotBOpenLabel = selectedMatch.SlotBOpenLabel ?? string.Empty;
+        editRoundNumber = selectedMatch.RoundNumber;
+    }
+
+    private async Task SaveMatchRoundAsync()
+    {
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        Result<TemplateMatch> result = await TemplateStore.UpdateMatchRoundAsync(
+            selectedMatch.TemplateMatchId,
+            editRoundNumber,
+            selectedMatch.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Could not save round.", Severity.Error);
+            return;
+        }
+
+        await LoadGraphAsync();
     }
 
     private bool IsOutcomeAvailableForSlot(int sourceMatchId, TemplateFeedOutcome outcome, TemplateMatchSlot slot)

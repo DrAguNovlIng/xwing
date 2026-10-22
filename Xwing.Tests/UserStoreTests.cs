@@ -191,7 +191,7 @@ public sealed class UserStoreTests
     }
 
     [Fact]
-    public async Task DeleteAsyncShouldRejectLastAdmin()
+    public async Task DeactivateAsyncShouldRejectLastAdmin()
     {
         TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
             connectionString,
@@ -204,11 +204,11 @@ public sealed class UserStoreTests
                 UserRoles.Admin,
                 TestContext.Current.CancellationToken);
             created.IsSuccess.ShouldBeTrue();
-            Result deleted = await stores.Users.DeleteAsync(
+            Result deactivated = await stores.Users.DeactivateAsync(
                 created.Value!.UserId,
                 TestContext.Current.CancellationToken);
-            deleted.IsSuccess.ShouldBeFalse();
-            deleted.Error.ShouldBe("Cannot delete the last admin user.");
+            deactivated.IsSuccess.ShouldBeFalse();
+            deactivated.Error.ShouldBe("Cannot deactivate the last active admin user.");
         }
     }
 }
