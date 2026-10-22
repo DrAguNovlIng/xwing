@@ -145,37 +145,21 @@ else
 @code {
     [Parameter]
     public int TournamentId { get; set; }
-
     private Tournament? tournament;
-
     private IReadOnlyList<TournamentMember> members = [];
-
     private bool loading = true;
-
     private bool actionInProgress;
-
     private int? currentUserId;
-
     private bool isAdmin;
-
     private DateTimeOffset todayUtc;
-
     private string? statusMessage;
-
     private Severity statusSeverity = Severity.Info;
-
     private bool rosterOpen;
-
     private bool currentUserJoined;
-
     private string? joinTimeLeftLabel;
-
     private bool joinTimeLeftUrgent;
-
     private PeriodicTimer? countdownTimer;
-
     private CancellationTokenSource? countdownCts;
-
     protected override async Task OnParametersSetAsync()
     {
         await StopCountdownAsync().ConfigureAwait(false);
@@ -284,7 +268,6 @@ else
     private bool CurrentUserHasSquad =>
         currentUserId is int uid &&
         members.Any(m => m.UserId == uid && !string.IsNullOrEmpty(m.SquadUrl));
-
     private async Task OpenSquadDialogAsync()
     {
         if (currentUserId is not int userId)
@@ -367,7 +350,6 @@ else
 
     private TournamentLifecycleStatus GetLifecycleStatus(Tournament t) =>
         TournamentSchedule.GetStatus(t, todayUtc);
-
     private string GetStatusLabel(Tournament t) =>
         GetLifecycleStatus(t) switch
         {
@@ -375,7 +357,6 @@ else
             TournamentLifecycleStatus.InProgress => "In progress",
             _ => "Past",
         };
-
     private Color GetStatusColor(Tournament t) =>
         GetLifecycleStatus(t) switch
         {
@@ -383,19 +364,14 @@ else
             TournamentLifecycleStatus.InProgress => Color.Success,
             _ => Color.Error,
         };
-
     private static string FormatDate(DateTimeOffset value) =>
         value.UtcDateTime.ToString("d", CultureInfo.CurrentCulture);
-
     private static string? GetFactionThemeKey(string factionDisplayName) =>
         XwaSquad.GetFactionThemeKey(factionDisplayName);
-
     private static string? GetFactionIconSlug(string factionDisplayName) =>
         XwaSquad.GetFactionIconSlug(factionDisplayName);
-
     private static string GetShipIconSlug(string shipId) =>
         XwaSquad.GetShipIconSlug(shipId);
-
     private void ShowStatus(string message, Severity severity)
     {
         statusMessage = message;

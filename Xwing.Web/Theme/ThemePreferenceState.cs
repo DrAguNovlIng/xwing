@@ -1,11 +1,8 @@
 namespace Xwing.Web.Theme;
-
 public sealed class ThemePreferenceState
 {
     public ThemePreference Preference { get; private set; } = ThemePreference.System;
-
     private Func<ThemePreference, Task>? setPreferenceAsync;
-
     public void Configure(ThemePreference initial, Func<ThemePreference, Task> onSetPreferenceAsync)
     {
         Preference = initial;

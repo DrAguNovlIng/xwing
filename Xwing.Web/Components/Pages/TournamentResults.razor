@@ -110,15 +110,10 @@
     private const int BoxHeight = 88;
     [Parameter]
     public int TournamentId { get; set; }
-
     private TournamentBracketGraph? graph;
-
     private string pageTitle = "Results";
-
     private bool loading = true;
-
     private bool isAdmin;
-
     protected override async Task OnParametersSetAsync()
     {
         loading = true;
@@ -133,22 +128,16 @@
     private int surfaceWidth => graph is null
         ? BracketGraphLayout.ToSurfacePixels(BracketGraphLayout.DefaultGraphWidthCells)
         : BracketGraphLayout.ToSurfacePixels(graph.Tournament.GraphWidthCells);
-
     private int surfaceHeight => graph is null
         ? BracketGraphLayout.ToSurfacePixels(BracketGraphLayout.DefaultGraphHeightCells)
         : BracketGraphLayout.ToSurfacePixels(graph.Tournament.GraphHeightCells);
-
     private string SurfaceStyle => $"width: {surfaceWidth}px; height: {surfaceHeight}px; max-width: {surfaceWidth}px;";
-
     private static string GetBoxStyle(int cellX, int cellY) =>
         $"left: {cellX * CellSize + BoxOffset}px; top: {cellY * CellSize + BoxOffset}px;";
-
     private static string DisplayName(TournamentMatch match) =>
         string.IsNullOrWhiteSpace(match.Name) ? $"Match {match.TournamentMatchId}" : match.Name!;
-
     private static string GetReplayLinkLabel(TournamentMatch match) =>
         match.Status == TournamentMatchStatus.Finished ? "Replay" : "Match";
-
     private static string GetMatchStatusClass(TournamentMatch match) =>
         match.Status switch
         {
@@ -156,7 +145,6 @@
             TournamentMatchStatus.Finished => "match-status-finished",
             _ => string.Empty,
         };
-
     private string FormatSlot(TournamentMatch match, TemplateMatchSlot slot)
     {
         int? userId = slot == TemplateMatchSlot.A ? match.SlotAUserId : match.SlotBUserId;

@@ -54,13 +54,9 @@
         MaxWidth = MaxWidth.Small,
         FullWidth = true,
     };
-
     private IReadOnlyList<TournamentListItem> tournaments = [];
-
     private string? statusMessage;
-
     private Severity statusSeverity = Severity.Info;
-
     protected override async Task OnInitializedAsync()
     {
         await ReloadAsync();
@@ -118,7 +114,6 @@
 
     private static string FormatDate(DateTimeOffset value) =>
         value.UtcDateTime.ToString("d", CultureInfo.CurrentCulture);
-
     private void ShowStatus(string message, Severity severity)
     {
         statusMessage = message;

@@ -164,6 +164,33 @@ h1:focus {
     min-width: 100%;
 }
 
+.bracket-editor-stage {
+    position: relative;
+    align-self: flex-start;
+}
+
+.bracket-match-editor-panel {
+    position: fixed;
+    top: calc(var(--mud-appbar-height, 64px) + 12px);
+    right: 12px;
+    width: min(22rem, calc(100vw - 24px));
+    max-height: calc(100dvh - var(--mud-appbar-height, 64px) - 24px);
+    overflow: auto;
+    z-index: 1200;
+}
+
+.bracket-match-editor-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.bracket-match-editor-panel-header .mud-typography-h6 {
+    flex: 1;
+    min-width: 0;
+}
+
 .template-graph-edges {
     position: absolute;
     top: 0;

@@ -8,11 +8,8 @@ namespace Xwing.Tests;
 public sealed class TournamentBracketStoreTests
 {
     private readonly string connectionString;
-
     private static readonly DateTimeOffset DefaultStart = new(2026, 11, 1, 0, 0, 0, TimeSpan.Zero);
-
     private static readonly DateTimeOffset DefaultEnd = new(2026, 11, 5, 0, 0, 0, TimeSpan.Zero);
-
     public TournamentBracketStoreTests(SqlServerFixture fixture)
     {
         ArgumentNullException.ThrowIfNull(fixture);

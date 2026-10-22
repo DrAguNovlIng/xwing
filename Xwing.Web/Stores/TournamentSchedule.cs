@@ -2,7 +2,6 @@ using System.Globalization;
 using Xwing.Web.Data;
 
 namespace Xwing.Web.Stores;
-
 public static class TournamentSchedule
 {
     public static DateTimeOffset TodayUtc(TimeProvider timeProvider)

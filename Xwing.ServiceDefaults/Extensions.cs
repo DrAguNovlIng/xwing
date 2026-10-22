@@ -17,15 +17,11 @@ public static class DefaultExtensions
 {
     private const string HealthEndpointPath = "/health";
     private const string AlivenessEndpointPath = "/alive";
-
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         builder.ConfigureOpenTelemetry();
-
         builder.AddDefaultHealthChecks();
-
         builder.Services.AddServiceDiscovery();
-
         builder.Services.ConfigureHttpClientDefaults(http =>
         {
             // Turn on resilience by default
@@ -40,7 +36,6 @@ public static class DefaultExtensions
         {
             options.AllowedSchemes = ["https"];
         });
-
         return builder;
     }
 
@@ -51,7 +46,6 @@ public static class DefaultExtensions
             logging.IncludeFormattedMessage = true;
             logging.IncludeScopes = true;
         });
-
         builder.Services.AddOpenTelemetry()
             .WithMetrics(metrics =>
             {
@@ -72,16 +66,13 @@ public static class DefaultExtensions
                     //.AddGrpcClientInstrumentation()
                     .AddHttpClientInstrumentation();
             });
-
         builder.AddOpenTelemetryExporters();
-
         return builder;
     }
 
     private static TBuilder AddOpenTelemetryExporters<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-
         if (useOtlpExporter)
         {
             builder.Services.AddOpenTelemetry().UseOtlpExporter();
@@ -95,7 +86,6 @@ public static class DefaultExtensions
         builder.Services.AddHealthChecks()
             // Add a default liveness check to ensure app is responsive
             .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
-
         return builder;
     }
 

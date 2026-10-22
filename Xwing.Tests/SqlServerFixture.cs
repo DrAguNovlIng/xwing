@@ -3,13 +3,10 @@ using Testcontainers.MsSql;
 using Xwing.Web.Data;
 
 namespace Xwing.Tests;
-
 public sealed class SqlServerFixture : IAsyncLifetime
 {
     private readonly MsSqlContainer container;
-
     public string ConnectionString { get; private set; } = string.Empty;
-
     public SqlServerFixture()
     {
         container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04")

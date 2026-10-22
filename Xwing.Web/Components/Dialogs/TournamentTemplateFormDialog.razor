@@ -18,16 +18,11 @@
 @code {
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = default!;
-
     [Parameter]
     public TournamentTemplate? Template { get; set; }
-
     private bool isCreate => Template is null;
-
     private string name = string.Empty;
-
     private string? errorMessage;
-
     protected override void OnParametersSet()
     {
         name = Template?.Name ?? string.Empty;
@@ -35,7 +30,6 @@
     }
 
     private void Cancel() => MudDialog.Cancel();
-
     private async Task SaveAsync()
     {
         if (isCreate)

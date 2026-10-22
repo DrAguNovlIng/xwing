@@ -2,11 +2,9 @@ using Microsoft.JSInterop;
 using Xwing.Web.Auth;
 
 namespace Xwing.Web.Theme;
-
 public static class ThemePreferenceCookie
 {
     public const string CookieName = "xwing-theme";
-
     public static ThemePreference Read(HttpContext? context)
     {
         if (context?.Request.Cookies.TryGetValue(CookieName, out string? value) != true)
@@ -23,7 +21,6 @@ public static class ThemePreferenceCookie
             ThemePreference.Dark => "dark",
             _ => "system",
         };
-
     public static async Task WriteAsync(IJSRuntime jsRuntime, ThemePreference preference)
     {
         ArgumentNullException.ThrowIfNull(jsRuntime);

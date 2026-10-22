@@ -1,5 +1,4 @@
 namespace Xwing.Web.Models;
-
 public sealed record Result<T>
 {
     public bool IsSuccess { get; init; }

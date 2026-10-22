@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
 namespace Xwing.Web.Data;
-
 public sealed class XwingDbContextFactory : IDesignTimeDbContextFactory<XwingDbContext>
 {
     public XwingDbContext CreateDbContext(string[] args)

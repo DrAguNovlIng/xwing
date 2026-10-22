@@ -1,5 +1,4 @@
 namespace Xwing.Web.Stores;
-
 internal static class MatchFeedCycleHelper
 {
     public static bool WouldCreateCycle(int sourceMatchId, int targetMatchId, IReadOnlyList<(int Source, int Target)> edges)

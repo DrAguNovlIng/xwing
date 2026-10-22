@@ -1,11 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 
 namespace Xwing.Web.Data;
-
 public sealed class XwingDbContext : DbContext
 {
     private readonly TimeProvider timeProvider;
-
     public XwingDbContext(DbContextOptions<XwingDbContext> options, TimeProvider timeProvider)
         : base(options)
     {
@@ -14,21 +12,13 @@ public sealed class XwingDbContext : DbContext
     }
 
     public DbSet<Tournament> Tournaments => Set<Tournament>();
-
     public DbSet<User> Users => Set<User>();
-
     public DbSet<TournamentParticipant> TournamentParticipants => Set<TournamentParticipant>();
-
     public DbSet<TournamentTemplate> TournamentTemplates => Set<TournamentTemplate>();
-
     public DbSet<TemplateMatch> TemplateMatches => Set<TemplateMatch>();
-
     public DbSet<TemplateMatchFeed> TemplateMatchFeeds => Set<TemplateMatchFeed>();
-
     public DbSet<TournamentMatch> TournamentMatches => Set<TournamentMatch>();
-
     public DbSet<TournamentMatchFeed> TournamentMatchFeeds => Set<TournamentMatchFeed>();
-
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         StampTimes();
@@ -96,7 +86,6 @@ public sealed class XwingDbContext : DbContext
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
-
         modelBuilder.Entity<TournamentTemplate>(entity =>
         {
             entity.ToTable("TournamentTemplates");
@@ -108,7 +97,6 @@ public sealed class XwingDbContext : DbContext
             entity.Property(e => e.TimeCreatedUtc).HasColumnType("datetimeoffset");
             entity.Property(e => e.TimeUpdatedUtc).HasColumnType("datetimeoffset");
         });
-
         modelBuilder.Entity<TemplateMatch>(entity =>
         {
             entity.ToTable("TemplateMatches");
@@ -124,7 +112,6 @@ public sealed class XwingDbContext : DbContext
                 .HasForeignKey(e => e.TournamentTemplateId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
-
         modelBuilder.Entity<TournamentMatch>(entity =>
         {
             entity.ToTable("TournamentMatches");
@@ -152,7 +139,6 @@ public sealed class XwingDbContext : DbContext
                 .HasForeignKey(e => e.SlotBUserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
-
         modelBuilder.Entity<TournamentMatchFeed>(entity =>
         {
             entity.ToTable("TournamentMatchFeeds");
@@ -173,7 +159,6 @@ public sealed class XwingDbContext : DbContext
                 .HasForeignKey(e => e.SourceTournamentMatchId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
-
         modelBuilder.Entity<TemplateMatchFeed>(entity =>
         {
             entity.ToTable("TemplateMatchFeeds");
@@ -194,7 +179,6 @@ public sealed class XwingDbContext : DbContext
                 .HasForeignKey(e => e.SourceTemplateMatchId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
-
         foreach (Type clrType in modelBuilder.Model.GetEntityTypes().Select(entityType => entityType.ClrType))
         {
             if (!typeof(BaseModel).IsAssignableFrom(clrType))

@@ -2,7 +2,6 @@ using Xwing.Web.Models;
 using Xwing.Web.Stores;
 
 namespace Xwing.Tests;
-
 public sealed class XwaSquadTests
 {
     private const string SampleXws = """

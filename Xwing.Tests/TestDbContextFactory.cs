@@ -2,12 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using Xwing.Web.Data;
 
 namespace Xwing.Tests;
-
 internal sealed class TestDbContextFactory : IDbContextFactory<XwingDbContext>
 {
     private readonly DbContextOptions<XwingDbContext> options;
     private readonly TimeProvider timeProvider;
-
     public TestDbContextFactory(string connectionString, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(timeProvider);

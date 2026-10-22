@@ -60,23 +60,14 @@
 
     [CascadingParameter]
     public ThemePreferenceState ThemeState { get; set; } = default!;
-
     private bool isSignedIn;
-
     private int? currentUserId;
-
     private string currentPassword = string.Empty;
-
     private string newPassword = string.Empty;
-
     private string confirmNewPassword = string.Empty;
-
     private string? passwordMessage;
-
     private Severity passwordMessageSeverity = Severity.Info;
-
     private bool passwordChangeInProgress;
-
     protected override async Task OnInitializedAsync()
     {
         AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync().ConfigureAwait(false);

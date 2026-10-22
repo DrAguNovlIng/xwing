@@ -2,11 +2,9 @@ using Xwing.Web.Data;
 using Xwing.Web.Stores;
 
 namespace Xwing.Tests;
-
 public sealed class TournamentScheduleTests
 {
     private static readonly DateTimeOffset DefaultEnd = new(2026, 11, 5, 0, 0, 0, TimeSpan.Zero);
-
     [Fact]
     public void FormatTimeLeftToJoinAtFortyEightHoursShouldUseDays()
     {

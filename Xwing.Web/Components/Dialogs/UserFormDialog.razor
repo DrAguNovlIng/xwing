@@ -34,25 +34,17 @@
 @code {
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = default!;
-
     [Parameter]
     public UserAccount? User { get; set; }
     [Parameter]
     public int? CurrentUserId { get; set; }
     private bool isCreate => User is null;
-
     private string userName = string.Empty;
-
     private string password = string.Empty;
-
     private string role = UserRoles.Member;
-
     private string? errorMessage;
-
     private string passwordLabel => isCreate ? "Password" : "New password (leave blank to keep)";
-
     private bool roleSelectDisabled => !isCreate && User is not null && CurrentUserId == User.UserId;
-
     protected override void OnParametersSet()
     {
         if (User is null)
@@ -71,7 +63,6 @@
     }
 
     private void Cancel() => MudDialog.Cancel();
-
     private async Task SaveAsync()
     {
         if (isCreate)

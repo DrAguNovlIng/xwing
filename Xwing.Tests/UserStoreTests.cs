@@ -8,7 +8,6 @@ namespace Xwing.Tests;
 public sealed class UserStoreTests
 {
     private readonly string connectionString;
-
     public UserStoreTests(SqlServerFixture fixture)
     {
         ArgumentNullException.ThrowIfNull(fixture);

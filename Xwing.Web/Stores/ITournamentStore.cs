@@ -2,7 +2,6 @@ using Xwing.Web.Data;
 using Xwing.Web.Models;
 
 namespace Xwing.Web.Stores;
-
 public interface ITournamentStore
 {
     Task<Result<Tournament>> CreateAsync(

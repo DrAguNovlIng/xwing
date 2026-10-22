@@ -1,7 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
 namespace Xwing.Web.Data;
-
 public abstract class BaseModel
 {
     public DateTimeOffset TimeCreatedUtc { get; set; }

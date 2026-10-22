@@ -31,6 +31,7 @@
         <MudStack Row="true" Spacing="2" AlignItems="AlignItems.End" Wrap="Wrap.Wrap">
             <MudNumericField T="int"
                              @bind-Value="editGraphWidthCells"
+                             @bind-Value:after="SaveGraphSizeAsync"
                              Label="Canvas width (cells)"
                              Variant="Variant.Outlined"
                              Min="@BracketGraphLayout.MinGraphCells"
@@ -38,16 +39,12 @@
                              Style="max-width: 10rem;" />
             <MudNumericField T="int"
                              @bind-Value="editGraphHeightCells"
+                             @bind-Value:after="SaveGraphSizeAsync"
                              Label="Canvas height (cells)"
                              Variant="Variant.Outlined"
                              Min="@BracketGraphLayout.MinGraphCells"
                              Max="@BracketGraphLayout.MaxGraphCells"
                              Style="max-width: 10rem;" />
-            <MudButton Variant="Variant.Outlined"
-                       Color="Color.Primary"
-                       OnClick="SaveGraphSizeAsync">
-                Save canvas
-            </MudButton>
         </MudStack>
     }
     @if (!string.IsNullOrEmpty(statusMessage))
@@ -60,8 +57,7 @@
     }
     else
     {
-        <MudGrid>
-            <MudItem xs="12" md="@(selectedMatch is null ? 12 : 9)">
+        <div class="bracket-editor-stage">
                 <div class="template-graph-surface @(draggingMatchId is not null ? "template-graph-surface-dragging" : string.Empty)"
                      style="@SurfaceStyle"
                      @onpointermove="OnSurfacePointerMove"
@@ -143,12 +139,15 @@
                         </div>
                     }
                 </div>
-            </MudItem>
-            @if (selectedMatch is not null)
+            @if (selectedMatch is not null && matchEditorOpen)
             {
-                <MudItem xs="12" md="3">
-                    <MudPaper Class="pa-4" Elevation="2">
-                        <MudText Typo="Typo.h6" Class="mb-3">Match</MudText>
+                    <MudPaper Class="pa-4 bracket-match-editor-panel" Elevation="4">
+                        <div class="bracket-match-editor-panel-header">
+                            <MudText Typo="Typo.h6">Match</MudText>
+                            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                           aria-label="Close match editor"
+                                           OnClick="CloseMatchEditor" />
+                        </div>
                         <MudTextField @bind-Value="editMatchName"
                                       Label="Name"
                                       Variant="Variant.Outlined"
@@ -242,9 +241,8 @@
                             Delete match
                         </MudButton>
                     </MudPaper>
-                </MudItem>
             }
-        </MudGrid>
+        </div>
     }
 </MudStack>
 
@@ -328,44 +326,26 @@
     private const int BoxWidth = 168;
     private const int BoxHeight = 88;
     private const string OpenSlotValue = "open";
-
     private int editGraphWidthCells;
-
     private int editGraphHeightCells;
-
     [Parameter]
     public int TournamentTemplateId { get; set; }
-
     private TournamentTemplateGraph? graph;
-
     private TemplateMatch? selectedMatch;
-
+    private bool matchEditorOpen;
     private string editMatchName = string.Empty;
-
     private string slotAValue = OpenSlotValue;
-
     private string slotBValue = OpenSlotValue;
-
     private string editSlotAOpenLabel = string.Empty;
-
     private string editSlotBOpenLabel = string.Empty;
-
     private int? editRoundNumber;
-
     private string pageTitle = "Template";
-
     private string? statusMessage;
-
     private Severity statusSeverity = Severity.Info;
-
     private int? draggingMatchId;
-
     private int dragCellX;
-
     private int dragCellY;
-
     private long? activePointerId;
-
     protected override async Task OnParametersSetAsync()
     {
         await LoadGraphAsync();
@@ -394,32 +374,35 @@
     private int surfaceWidth => graph is null
         ? BracketGraphLayout.ToSurfacePixels(BracketGraphLayout.DefaultGraphWidthCells)
         : BracketGraphLayout.ToSurfacePixels(graph.Template.GraphWidthCells);
-
     private int surfaceHeight => graph is null
         ? BracketGraphLayout.ToSurfacePixels(BracketGraphLayout.DefaultGraphHeightCells)
         : BracketGraphLayout.ToSurfacePixels(graph.Template.GraphHeightCells);
-
     private string SurfaceStyle => $"width: {surfaceWidth}px; height: {surfaceHeight}px; max-width: {surfaceWidth}px;";
-
     private int GetCellX(TemplateMatch match) =>
         draggingMatchId == match.TemplateMatchId ? dragCellX : match.PositionX;
-
     private int GetCellY(TemplateMatch match) =>
         draggingMatchId == match.TemplateMatchId ? dragCellY : match.PositionY;
-
     private static string GetBoxStyle(int cellX, int cellY) =>
         $"left: {cellX * CellSize + BoxOffset}px; top: {cellY * CellSize + BoxOffset}px;";
-
     private void SelectMatch(TemplateMatch match)
     {
         if (draggingMatchId is not null)
         {
             return;
         }
+
+        if (selectedMatch?.TemplateMatchId == match.TemplateMatchId)
+        {
+            matchEditorOpen = !matchEditorOpen;
+            return;
+        }
+
         selectedMatch = match;
+        matchEditorOpen = true;
         SyncSidePanel();
     }
 
+    private void CloseMatchEditor() => matchEditorOpen = false;
     private void SyncSidePanel()
     {
         if (selectedMatch is null || graph is null)
@@ -455,27 +438,59 @@
         await LoadGraphAsync();
     }
 
-    private async Task SaveGraphSizeAsync()
+    private Task saveGraphSizeQueue = Task.CompletedTask;
+    private Task SaveGraphSizeAsync()
     {
-        if (graph is null)
+        saveGraphSizeQueue = SaveNextGraphSizeAsync(saveGraphSizeQueue);
+        return saveGraphSizeQueue;
+    }
+
+    private async Task SaveNextGraphSizeAsync(Task previous)
+    {
+        try
+        {
+            await previous;
+        }
+        catch (Exception)
+        {
+            // The previous attempt already reported its own error.
+        }
+
+        if (graph is null
+            || (editGraphWidthCells == graph.Template.GraphWidthCells
+                && editGraphHeightCells == graph.Template.GraphHeightCells))
         {
             return;
         }
 
+        int widthCells = editGraphWidthCells;
+        int heightCells = editGraphHeightCells;
+        int previousWidthCells = graph.Template.GraphWidthCells;
+        int previousHeightCells = graph.Template.GraphHeightCells;
+        byte[] rowVersion = graph.Template.RowVersion;
+        graph.Template.GraphWidthCells = widthCells;
+        graph.Template.GraphHeightCells = heightCells;
         Result<TournamentTemplate> result = await TemplateStore.UpdateGraphSizeAsync(
             graph.Template.TournamentTemplateId,
-            editGraphWidthCells,
-            editGraphHeightCells,
-            graph.Template.RowVersion,
+            widthCells,
+            heightCells,
+            rowVersion,
             CancellationToken.None);
         if (!result.IsSuccess)
         {
+            graph.Template.GraphWidthCells = previousWidthCells;
+            graph.Template.GraphHeightCells = previousHeightCells;
+            editGraphWidthCells = previousWidthCells;
+            editGraphHeightCells = previousHeightCells;
             ShowStatus(result.Error ?? "Could not save canvas size.", Severity.Error);
             return;
         }
 
-        await LoadGraphAsync();
-        ShowStatus("Canvas size saved.", Severity.Success);
+        graph.Template.RowVersion = result.Value!.RowVersion;
+        if (statusSeverity == Severity.Error)
+        {
+            statusMessage = null;
+        }
     }
 
     private bool IsOutcomeAvailableForSlot(int sourceMatchId, TemplateFeedOutcome outcome, TemplateMatchSlot slot)
@@ -507,15 +522,11 @@
     }
 
     private static string WinnerSlotValue(int sourceMatchId) => $"w:{sourceMatchId}";
-
     private static string LoserSlotValue(int sourceMatchId) => $"l:{sourceMatchId}";
-
     private IEnumerable<TemplateMatch> OtherMatches(TemplateMatch match) =>
         graph!.Matches.Where(m => m.TemplateMatchId != match.TemplateMatchId);
-
     private static string DisplayName(TemplateMatch match) =>
         string.IsNullOrWhiteSpace(match.Name) ? $"Match {match.TemplateMatchId}" : match.Name!;
-
     private string FormatSlot(TemplateMatch match, TemplateMatchSlot slot)
     {
         TemplateMatchFeed? feed = graph!.Feeds.SingleOrDefault(
@@ -618,6 +629,7 @@
         }
         await LoadGraphAsync();
         selectedMatch = graph!.Matches.Single(m => m.TemplateMatchId == result.Value!.TemplateMatchId);
+        matchEditorOpen = true;
         SyncSidePanel();
     }
 
@@ -641,15 +653,11 @@
     }
 
     private async Task OnSlotAChangedAsync(string value) => await SetSlotAsync(TemplateMatchSlot.A, value);
-
     private async Task OnSlotBChangedAsync(string value) => await SetSlotAsync(TemplateMatchSlot.B, value);
-
     private async Task SaveSlotAOpenLabelAsync() =>
         await SaveSlotOpenLabelAsync(TemplateMatchSlot.A, editSlotAOpenLabel);
-
     private async Task SaveSlotBOpenLabelAsync() =>
         await SaveSlotOpenLabelAsync(TemplateMatchSlot.B, editSlotBOpenLabel);
-
     private async Task SaveSlotOpenLabelAsync(TemplateMatchSlot slot, string label)
     {
         if (selectedMatch is null || graph is null)

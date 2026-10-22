@@ -8,7 +8,6 @@ namespace Xwing.Tests;
 public sealed class TournamentTemplateStoreTests
 {
     private readonly string connectionString;
-
     public TournamentTemplateStoreTests(SqlServerFixture fixture)
     {
         ArgumentNullException.ThrowIfNull(fixture);

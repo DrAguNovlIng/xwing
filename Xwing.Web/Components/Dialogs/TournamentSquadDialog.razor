@@ -27,22 +27,15 @@
 @code {
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = default!;
-
     [Parameter]
     public int TournamentId { get; set; }
-
     [Parameter]
     public int UserId { get; set; }
-
     [Parameter]
     public bool HasExistingSquad { get; set; }
-
     private string squadJson = string.Empty;
-
     private string? errorMessage;
-
     private void Cancel() => MudDialog.Cancel();
-
     private async Task SaveAsync()
     {
         errorMessage = null;

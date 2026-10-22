@@ -3,16 +3,13 @@ using System.Text.Json;
 using Xwing.Web.Models;
 
 namespace Xwing.Web.Stores;
-
 public sealed record XwaSquad
 {
     public required string FactionId { get; init; }
     public required string FactionDisplayName { get; init; }
     public required IReadOnlyList<XwaSquadPilotEntry> Pilots { get; init; }
-
     [SuppressMessage("Design", "CA1056:URI-like properties should not be strings", Justification = "Parsed absolute URL stored for persistence and href binding.")]
     public required string Url { get; init; }
-
     public static Result<XwaSquad> Parse(string jsonText)
     {
         if (string.IsNullOrWhiteSpace(jsonText))

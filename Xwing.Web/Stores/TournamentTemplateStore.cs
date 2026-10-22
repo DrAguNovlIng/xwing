@@ -3,19 +3,13 @@ using Xwing.Web.Data;
 using Xwing.Web.Models;
 
 namespace Xwing.Web.Stores;
-
 public sealed class TournamentTemplateStore : ITournamentTemplateStore
 {
     private const int NewMatchColumnsPerRow = 12;
-
     private const int NewMatchStrideX = 5;
-
     private const int NewMatchStrideY = 3;
-
     private readonly IDbContextFactory<XwingDbContext> contextFactory;
-
     private readonly StoreConcurrencyHelpers concurrencyHelpers;
-
     public TournamentTemplateStore(
         IDbContextFactory<XwingDbContext> contextFactory,
         StoreConcurrencyHelpers concurrencyHelpers)
@@ -302,13 +296,11 @@ public sealed class TournamentTemplateStore : ITournamentTemplateStore
             return Result.Fail("Match not found.");
         }
         context.Entry(targetMatch).Property(e => e.RowVersion).OriginalValue = rowVersion;
-
         TemplateMatchFeed? existingSlotFeed = await context.TemplateMatchFeeds
             .SingleOrDefaultAsync(
                 f => f.TargetTemplateMatchId == targetTemplateMatchId && f.TargetSlot == targetSlot,
                 cancellationToken)
             .ConfigureAwait(false);
-
         if (sourceTemplateMatchId is null || sourceOutcome is null)
         {
             if (existingSlotFeed is not null)
@@ -361,7 +353,6 @@ public sealed class TournamentTemplateStore : ITournamentTemplateStore
                 .Where(f => templateMatchIds.Contains(f.TargetTemplateMatchId))
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
-
         List<(int Source, int Target)> edges = templateFeeds
             .Where(f => existingSlotFeed is null || f.TemplateMatchFeedId != existingSlotFeed.TemplateMatchFeedId)
             .Select(f => (f.SourceTemplateMatchId, f.TargetTemplateMatchId))

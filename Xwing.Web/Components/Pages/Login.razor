@@ -31,7 +31,6 @@
 @code {
     private string? errorMessage;
     private string returnUrl = "/tournaments";
-
     protected override async Task OnInitializedAsync()
     {
         if (!await UserStore.AnyAdminExistsAsync(CancellationToken.None).ConfigureAwait(false))

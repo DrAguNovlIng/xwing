@@ -2,11 +2,9 @@ using System.Reflection;
 using System.Text.Json;
 
 namespace Xwing.Web.Stores;
-
 public static class XwsPilotCatalog
 {
     private static readonly Lazy<Dictionary<string, string>> DisplayNames = new(LoadDisplayNames);
-
     public static string ResolvePilotLabel(string? pilotId, string shipId)
     {
         if (string.IsNullOrWhiteSpace(pilotId))

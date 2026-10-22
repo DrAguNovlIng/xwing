@@ -16,15 +16,10 @@
 
 @code {
     private MudThemeProvider? mudThemeProvider;
-
     private bool isDarkMode = true;
-
     private bool observeSystem = true;
-
     private readonly ThemePreferenceState themeState = new();
-
     private bool themeApplied;
-
     protected override void OnInitialized()
     {
         ThemePreference fromCookie = ThemePreferenceCookie.Read(HttpContextAccessor.HttpContext);

@@ -1,7 +1,6 @@
 using Xwing.Web.Stores;
 
 namespace Xwing.Tests;
-
 internal sealed class TestStores : IDisposable
 {
     public void Dispose()
@@ -25,10 +24,7 @@ internal sealed class TestStores : IDisposable
     }
 
     public ITournamentStore Tournaments { get; }
-
     public IUserStore Users { get; }
-
     public ITournamentTemplateStore Templates { get; }
-
     public ITournamentBracketStore Brackets { get; }
 }

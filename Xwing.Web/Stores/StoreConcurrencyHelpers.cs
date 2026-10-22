@@ -4,11 +4,9 @@ using Xwing.Web.Data;
 using Xwing.Web.Models;
 
 namespace Xwing.Web.Stores;
-
 public sealed class StoreConcurrencyHelpers
 {
     private readonly ILogger<StoreConcurrencyHelpers> logger;
-
     public StoreConcurrencyHelpers(ILogger<StoreConcurrencyHelpers> logger)
     {
         ArgumentNullException.ThrowIfNull(logger);

@@ -16,8 +16,6 @@
 @code {
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = default!;
-
     private void Cancel() => MudDialog.Cancel();
-
     private void Confirm() => MudDialog.Close(DialogResult.Ok(true));
 }

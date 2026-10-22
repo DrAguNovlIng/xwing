@@ -4,13 +4,11 @@ using Xwing.Web.Data;
 using Xwing.Web.Models;
 
 namespace Xwing.Web.Stores;
-
 public sealed class UserStore : IUserStore
 {
     private readonly IDbContextFactory<XwingDbContext> contextFactory;
     private readonly StoreConcurrencyHelpers concurrencyHelpers;
     private readonly PasswordHasher<User> passwordHasher;
-
     public UserStore(
         IDbContextFactory<XwingDbContext> contextFactory,
         StoreConcurrencyHelpers concurrencyHelpers,

@@ -2,7 +2,6 @@ using Xwing.Web.Data;
 using Xwing.Web.Models;
 
 namespace Xwing.Web.Stores;
-
 public interface ITournamentBracketStore
 {
     Task<Result<TournamentBracketGraph>> GetGraphAsync(int tournamentId, CancellationToken cancellationToken);
@@ -12,15 +11,10 @@ public interface ITournamentBracketStore
     Task<Result<Tournament>> UpdateGraphSizeAsync(
 
         int tournamentId,
-
         int graphWidthCells,
-
         int graphHeightCells,
-
         byte[] rowVersion,
-
         CancellationToken cancellationToken);
-
     Task<Result<TournamentMatch>> AddMatchAsync(int tournamentId, CancellationToken cancellationToken);
 
     Task<Result<TournamentMatch>> UpdateMatchNameAsync(
@@ -28,20 +22,17 @@ public interface ITournamentBracketStore
         string? name,
         byte[] rowVersion,
         CancellationToken cancellationToken);
-
     Task<Result<TournamentMatch>> UpdateMatchPositionAsync(
         int tournamentMatchId,
         int positionX,
         int positionY,
         byte[] rowVersion,
         CancellationToken cancellationToken);
-
     Task<Result<TournamentMatch>> UpdateMatchRoundAsync(
         int tournamentMatchId,
         int? roundNumber,
         byte[] rowVersion,
         CancellationToken cancellationToken);
-
     Task<Result> DeleteMatchAsync(int tournamentMatchId, byte[] rowVersion, CancellationToken cancellationToken);
 
     Task<Result> SetSlotFeedAsync(
@@ -51,14 +42,12 @@ public interface ITournamentBracketStore
         TemplateFeedOutcome? sourceOutcome,
         byte[] rowVersion,
         CancellationToken cancellationToken);
-
     Task<Result<TournamentMatch>> UpdateSlotOpenLabelAsync(
         int tournamentMatchId,
         TemplateMatchSlot slot,
         string? openLabel,
         byte[] rowVersion,
         CancellationToken cancellationToken);
-
     Task<Result<TournamentMatch>> UpdateMatchResultAsync(
         int tournamentId,
         int tournamentMatchId,

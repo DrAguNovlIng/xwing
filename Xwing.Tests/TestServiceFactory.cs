@@ -5,7 +5,6 @@ using Xwing.Web.Data;
 using Xwing.Web.Stores;
 
 namespace Xwing.Tests;
-
 internal static class TestServiceFactory
 {
     public static TestStores CreateStores(string connectionString, TimeProvider? timeProvider = null)

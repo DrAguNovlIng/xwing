@@ -20,19 +20,13 @@
 @code {
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = default!;
-
     [Parameter]
     public Tournament? Tournament { get; set; }
     private bool isCreate => Tournament is null;
-
     private string name = string.Empty;
-
     private DateTime? startDate;
-
     private DateTime? endDate;
-
     private string? errorMessage;
-
     protected override void OnParametersSet()
     {
         name = Tournament?.Name ?? string.Empty;
@@ -42,7 +36,6 @@
     }
 
     private void Cancel() => MudDialog.Cancel();
-
     private async Task SaveAsync()
     {
         if (startDate is null || endDate is null)

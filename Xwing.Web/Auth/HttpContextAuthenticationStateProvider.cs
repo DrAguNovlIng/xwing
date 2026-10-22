@@ -2,11 +2,9 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Xwing.Web.Auth;
-
 public sealed class HttpContextAuthenticationStateProvider : AuthenticationStateProvider
 {
     private readonly IHttpContextAccessor httpContextAccessor;
-
     public HttpContextAuthenticationStateProvider(IHttpContextAccessor httpContextAccessor)
     {
         ArgumentNullException.ThrowIfNull(httpContextAccessor);

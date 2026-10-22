@@ -46,13 +46,9 @@
         MaxWidth = MaxWidth.Small,
         FullWidth = true,
     };
-
     private IReadOnlyList<TournamentTemplate> templates = [];
-
     private string? statusMessage;
-
     private Severity statusSeverity = Severity.Info;
-
     protected override async Task OnInitializedAsync()
     {
         await ReloadAsync();

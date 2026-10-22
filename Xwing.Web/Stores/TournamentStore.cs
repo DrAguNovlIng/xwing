@@ -5,20 +5,15 @@ using Xwing.Web.Data;
 using Xwing.Web.Models;
 
 namespace Xwing.Web.Stores;
-
 public sealed class TournamentStore : ITournamentStore
 {
     private static readonly JsonSerializerOptions SquadShipJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
-
     private readonly IDbContextFactory<XwingDbContext> contextFactory;
-
     private readonly StoreConcurrencyHelpers concurrencyHelpers;
-
     private readonly TimeProvider timeProvider;
-
     public TournamentStore(
         IDbContextFactory<XwingDbContext> contextFactory,
         StoreConcurrencyHelpers concurrencyHelpers,
@@ -460,7 +455,6 @@ public sealed record TournamentMember
     public string UserName { get; init; } = string.Empty;
     public string? SquadFactionDisplay { get; init; }
     public IReadOnlyList<SquadShipDisplay> SquadShips { get; init; } = [];
-
     [SuppressMessage("Design", "CA1056:URI-like properties should not be strings", Justification = "Blazor href binding uses string URLs.")]
     public string? SquadUrl { get; init; }
 }
@@ -468,13 +462,11 @@ public sealed record TournamentMember
 public sealed record SquadShipDisplay
 {
     public required string ShipId { get; init; }
-
     public required string PilotLabel { get; init; }
 }
 
 internal sealed record SquadShipJsonEntry
 {
     public required string Ship { get; init; }
-
     public string? Pilot { get; init; }
 }

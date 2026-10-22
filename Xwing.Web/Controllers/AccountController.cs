@@ -15,7 +15,6 @@ namespace Xwing.Web.Controllers;
 public sealed class AccountController : Controller
 {
     private readonly IUserStore userStore;
-
     public AccountController(IUserStore userStore)
     {
         ArgumentNullException.ThrowIfNull(userStore);

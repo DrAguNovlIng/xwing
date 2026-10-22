@@ -1,7 +1,6 @@
 using Xwing.Web.Models;
 
 namespace Xwing.Web.Stores;
-
 public interface IUserStore
 {
     Task<bool> AnyAdminExistsAsync(CancellationToken cancellationToken);

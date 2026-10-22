@@ -68,13 +68,9 @@
 
 @code {
     private MudTable<TournamentListItem>? table;
-
     private string nameSearch = string.Empty;
-
     private TournamentWhenFilter whenFilter = TournamentWhenFilter.Active;
-
     private DateTimeOffset todayUtc;
-
     protected override void OnInitialized()
     {
         todayUtc = TournamentSchedule.TodayUtc(TimeProvider);
@@ -123,10 +119,8 @@
             "End" => TournamentSortField.EndDate,
             _ => TournamentSortField.StartDate,
         };
-
     private TournamentLifecycleStatus GetLifecycleStatus(Tournament tournament) =>
         TournamentSchedule.GetStatus(tournament, todayUtc);
-
     private string GetStatusLabel(Tournament tournament) =>
         GetLifecycleStatus(tournament) switch
         {
@@ -134,7 +128,6 @@
             TournamentLifecycleStatus.InProgress => "In progress",
             _ => "Past",
         };
-
     private Color GetStatusColor(Tournament tournament) =>
         GetLifecycleStatus(tournament) switch
         {
@@ -142,7 +135,6 @@
             TournamentLifecycleStatus.InProgress => Color.Success,
             _ => Color.Error,
         };
-
     private static string FormatDate(DateTimeOffset value) =>
         value.UtcDateTime.ToString("d", CultureInfo.CurrentCulture);
 }

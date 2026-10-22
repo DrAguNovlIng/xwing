@@ -1,4 +1,4 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 @using Microsoft.AspNetCore.Components.Authorization
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
@@ -54,17 +54,11 @@
 
 @code {
     private bool _drawerOpen = true;
-
     private bool isSignedIn;
-
     private bool isAdmin;
-
     private bool showLoginNav;
-
     private bool showUsersNav;
-
     private string userName = string.Empty;
-
     protected override async Task OnInitializedAsync()
     {
         showUsersNav = !await UserStore.AnyAdminExistsAsync(CancellationToken.None).ConfigureAwait(false);

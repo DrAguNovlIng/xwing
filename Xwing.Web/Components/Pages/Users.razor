@@ -87,23 +87,14 @@ else if (isAdmin)
         MaxWidth = MaxWidth.Small,
         FullWidth = true,
     };
-
     private bool initialized;
-
     private bool anyAdmin;
-
     private bool isAdmin;
-
     private int? currentUserId;
-
     private string? bootstrapError;
-
     private string? statusMessage;
-
     private Severity statusSeverity = Severity.Info;
-
     private IReadOnlyList<UserAccount> users = [];
-
     protected override async Task OnInitializedAsync()
     {
         anyAdmin = await UserStore.AnyAdminExistsAsync(CancellationToken.None);

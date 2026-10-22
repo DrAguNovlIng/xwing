@@ -1,5 +1,4 @@
 namespace Xwing.Web.Data;
-
 public enum TournamentMatchStatus
 {
     NotStarted = 0,

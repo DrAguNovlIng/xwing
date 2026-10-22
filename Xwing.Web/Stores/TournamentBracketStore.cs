@@ -4,21 +4,14 @@ using Xwing.Web.Data;
 using Xwing.Web.Models;
 
 namespace Xwing.Web.Stores;
-
 public sealed class TournamentBracketStore : ITournamentBracketStore
 {
     private const int NewMatchColumnsPerRow = 12;
-
     private const int NewMatchStrideX = 5;
-
     private const int NewMatchStrideY = 3;
-
     private readonly IDbContextFactory<XwingDbContext> contextFactory;
-
     private readonly ITournamentTemplateStore templateStore;
-
     private readonly StoreConcurrencyHelpers concurrencyHelpers;
-
     public TournamentBracketStore(
         IDbContextFactory<XwingDbContext> contextFactory,
         ITournamentTemplateStore templateStore,
