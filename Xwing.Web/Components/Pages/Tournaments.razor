@@ -3,10 +3,12 @@
 @attribute [Authorize]
 
 @using System.Globalization
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
 @using Xwing.Web.Data
 @using Xwing.Web.Stores
 @inject ITournamentStore TournamentStore
-
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject TimeProvider TimeProvider
 <PageTitle>Tournaments</PageTitle>
 
@@ -34,49 +36,149 @@
         </MudSelect>
     </MudItem>
 </MudGrid>
-<MudTable @ref="table"
-          ServerData="LoadServerDataAsync"
-          Hover="true"
-          Dense="true"
-          SortLabel="Sort">
-    <HeaderContent>
-        <MudTh><MudTableSortLabel T="TournamentListItem" SortLabel="Name">Name</MudTableSortLabel></MudTh>
-        <MudTh>Players</MudTh>
-        <MudTh>Status</MudTh>
-        <MudTh><MudTableSortLabel T="TournamentListItem" SortLabel="Start" InitialDirection="SortDirection.Ascending">Start</MudTableSortLabel></MudTh>
-        <MudTh><MudTableSortLabel T="TournamentListItem" SortLabel="End">End</MudTableSortLabel></MudTh>
-        <MudTh>Results</MudTh>
-    </HeaderContent>
-    <RowTemplate>
-        <MudTd DataLabel="Name">
-            <MudLink Href="@($"/tournaments/{context.Tournament.TournamentId}")" Underline="Underline.Hover">@context.Tournament.Name</MudLink>
-        </MudTd>
-        <MudTd DataLabel="Players">@context.ParticipantCount</MudTd>
-        <MudTd DataLabel="Status">
-            <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Tournament)">@GetStatusLabel(context.Tournament)</MudChip>
-        </MudTd>
-        <MudTd DataLabel="Start">@FormatDate(context.Tournament.StartDateUtc)</MudTd>
-        <MudTd DataLabel="End">@FormatDate(context.Tournament.EndDateUtc)</MudTd>
-        <MudTd DataLabel="Results">
-            <MudLink Href="@($"/tournaments/{context.Tournament.TournamentId}/results")" Underline="Underline.Hover">Results</MudLink>
-        </MudTd>
-    </RowTemplate>
-    <NoRecordsContent>
-        <MudText>No tournaments match your search.</MudText>
-    </NoRecordsContent>
-</MudTable>
+<MudHidden Breakpoint="Breakpoint.SmAndUp">
+    <div class="tournament-list-cards">
+        @if (listItems.Count == 0)
+        {
+            <MudText>No tournaments match your search.</MudText>
+        }
+        else
+        {
+            @foreach (TournamentListItem item in listItems)
+            {
+                <MudPaper Class="tournament-list-card pa-3" Outlined="true">
+                    <MudLink Href="@($"/tournaments/{item.Tournament.TournamentId}")"
+                             Typo="Typo.subtitle1"
+                             Underline="Underline.Hover"
+                             Class="tournament-list-card-name">
+                        @item.Tournament.Name
+                    </MudLink>
+                    <div class="tournament-list-card-status-row">
+                        <MudChip T="string"
+                                 Size="Size.Small"
+                                 Color="@GetStatusColor(item.Tournament)">
+                            @GetStatusLabel(item.Tournament)
+                        </MudChip>
+                        @if (item.CurrentUserJoined)
+                        {
+                            <MudChip T="string"
+                                     Size="Size.Small"
+                                     Color="@GetMembershipChipColor(item)">
+                                @GetMembershipChipLabel(item)
+                            </MudChip>
+                        }
+                        <MudLink Href="@($"/tournaments/{item.Tournament.TournamentId}/results")"
+                                 Underline="Underline.Hover"
+                                 Class="tournament-list-card-results">
+                            Results
+                        </MudLink>
+                    </div>
+                    <div class="tournament-list-card-meta">
+                        <span class="tournament-list-card-meta-item">
+                            <MudIcon Icon="@Icons.Material.Filled.Groups"
+                                     Size="Size.Small"
+                                     Class="tournament-list-card-meta-icon" />
+                            @item.ParticipantCount
+                        </span>
+                        <span class="tournament-list-card-meta-item tournament-list-card-dates">
+                            @if (IsSameUtcCalendarDay(item.Tournament.StartDateUtc, item.Tournament.EndDateUtc))
+                            {
+                                @FormatDate(item.Tournament.StartDateUtc)
+                            }
+                            else
+                            {
+                                @FormatDate(item.Tournament.StartDateUtc)
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowForward"
+                                         Size="Size.Small"
+                                         Class="tournament-list-card-date-arrow" />
+                                @FormatDate(item.Tournament.EndDateUtc)
+                            }
+                        </span>
+                    </div>
+                </MudPaper>
+            }
+        }
+    </div>
+</MudHidden>
+<MudHidden Breakpoint="Breakpoint.Xs">
+    <MudTable @ref="table"
+              ServerData="LoadServerDataAsync"
+              Hover="true"
+              Dense="true"
+              Breakpoint="Breakpoint.None"
+              SortLabel="Sort">
+        <HeaderContent>
+            <MudTh><MudTableSortLabel T="TournamentListItem" SortLabel="Name">Name</MudTableSortLabel></MudTh>
+            <MudTh>Players</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh><MudTableSortLabel T="TournamentListItem" SortLabel="Start" InitialDirection="SortDirection.Ascending">Start</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel T="TournamentListItem" SortLabel="End">End</MudTableSortLabel></MudTh>
+            <MudTh>Results</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Name">
+                <div class="tournament-list-name-cell">
+                    <MudLink Href="@($"/tournaments/{context.Tournament.TournamentId}")" Underline="Underline.Hover">@context.Tournament.Name</MudLink>
+                    @if (context.CurrentUserJoined)
+                    {
+                        <MudChip T="string"
+                                 Size="Size.Small"
+                                 Color="@GetMembershipChipColor(context)">
+                            @GetMembershipChipLabel(context)
+                        </MudChip>
+                    }
+                </div>
+            </MudTd>
+            <MudTd DataLabel="Players">@context.ParticipantCount</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Tournament)">@GetStatusLabel(context.Tournament)</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Start">@FormatDate(context.Tournament.StartDateUtc)</MudTd>
+            <MudTd DataLabel="End">@FormatDate(context.Tournament.EndDateUtc)</MudTd>
+            <MudTd DataLabel="Results">
+                <MudLink Href="@($"/tournaments/{context.Tournament.TournamentId}/results")" Underline="Underline.Hover">Results</MudLink>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText>No tournaments match your search.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+</MudHidden>
 
 @code {
     private MudTable<TournamentListItem>? table;
     private string nameSearch = string.Empty;
     private TournamentWhenFilter whenFilter = TournamentWhenFilter.Active;
     private DateTimeOffset todayUtc;
-    protected override void OnInitialized()
+    private IReadOnlyList<TournamentListItem> listItems = [];
+    private TableState lastTableState = new()
+    {
+        SortLabel = "Start",
+        SortDirection = SortDirection.Ascending,
+    };
+    private int? currentUserId;
+
+    protected override async Task OnInitializedAsync()
     {
         todayUtc = TournamentSchedule.TodayUtc(TimeProvider);
+        AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        string? idClaim = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        currentUserId = int.TryParse(idClaim, CultureInfo.InvariantCulture, out int parsedId) ? parsedId : null;
+        listItems = await FetchListItemsAsync(lastTableState, CancellationToken.None);
     }
 
     private async Task<TableData<TournamentListItem>> LoadServerDataAsync(TableState state, CancellationToken cancellationToken)
+    {
+        lastTableState = state;
+        listItems = await FetchListItemsAsync(state, cancellationToken);
+        return new TableData<TournamentListItem>
+        {
+            Items = listItems,
+            TotalItems = listItems.Count,
+        };
+    }
+
+    private async Task<IReadOnlyList<TournamentListItem>> FetchListItemsAsync(TableState state, CancellationToken cancellationToken)
     {
         todayUtc = TournamentSchedule.TodayUtc(TimeProvider);
         var query = new TournamentSearchQuery
@@ -85,31 +187,33 @@
             WhenFilter = whenFilter,
             SortField = MapSortField(state.SortLabel),
             SortDescending = state.SortDirection == SortDirection.Descending,
+            CurrentUserId = currentUserId,
         };
-        IReadOnlyList<TournamentListItem> items = await TournamentStore.SearchAsync(query, cancellationToken);
-        return new TableData<TournamentListItem>
-        {
-            Items = items,
-            TotalItems = items.Count,
-        };
+        return await TournamentStore.SearchAsync(query, cancellationToken);
     }
 
     private async Task OnNameSearchChangedAsync(string value)
     {
         nameSearch = value;
-        if (table is not null)
-        {
-            await table.ReloadServerData();
-        }
+        await ReloadListAsync();
     }
 
     private async Task OnWhenFilterChangedAsync(TournamentWhenFilter value)
     {
         whenFilter = value;
+        await ReloadListAsync();
+    }
+
+    private async Task ReloadListAsync()
+    {
         if (table is not null)
         {
             await table.ReloadServerData();
+            return;
         }
+
+        listItems = await FetchListItemsAsync(lastTableState, CancellationToken.None);
+        StateHasChanged();
     }
 
     private static TournamentSortField MapSortField(string? sortLabel) =>
@@ -137,4 +241,13 @@
         };
     private static string FormatDate(DateTimeOffset value) =>
         value.UtcDateTime.ToString("d", CultureInfo.CurrentCulture);
+
+    private static bool IsSameUtcCalendarDay(DateTimeOffset start, DateTimeOffset end) =>
+        start.UtcDateTime.Date == end.UtcDateTime.Date;
+
+    private static string GetMembershipChipLabel(TournamentListItem item) =>
+        item.CurrentUserHasSquad ? "Squad added" : "No squad";
+
+    private static Color GetMembershipChipColor(TournamentListItem item) =>
+        item.CurrentUserHasSquad ? Color.Success : Color.Warning;
 }

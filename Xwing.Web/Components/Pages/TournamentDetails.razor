@@ -52,6 +52,10 @@ else
     <div class="tournament-details-summary mb-4">
         <div class="tournament-details-facts">
             <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(tournament)">@GetStatusLabel(tournament)</MudChip>
+            @if (currentUserJoined && CurrentUserHasSquad)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Success">Squad added</MudChip>
+            }
             <div class="tournament-details-dates">
                 <MudText Typo="Typo.body2">Start: @FormatDate(tournament.StartDateUtc)</MudText>
                 <MudText Typo="Typo.body2">End: @FormatDate(tournament.EndDateUtc)</MudText>
@@ -65,13 +69,19 @@ else
             }
         </div>
     </div>
+    @if (currentUserJoined && !CurrentUserHasSquad)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-4">
+            You have not added a squad yet.
+        </MudAlert>
+    }
     @if (rosterOpen)
     {
         <div class="tournament-details-roster-actions mb-4">
             @if (currentUserJoined)
             {
-                <MudButton Variant="Variant.Outlined"
-                           Color="Color.Primary"
+                <MudButton Variant="@(CurrentUserHasSquad ? Variant.Outlined : Variant.Filled)"
+                           Color="@(CurrentUserHasSquad ? Color.Primary : Color.Warning)"
                            Disabled="actionInProgress"
                            OnClick="OpenSquadDialogAsync">
                     @(CurrentUserHasSquad ? "Change squad" : "Add squad")
@@ -108,7 +118,11 @@ else
         <MudStack Spacing="2">
             @foreach (TournamentMember member in members)
             {
-                <MudPaper Class="pa-3" Elevation="0" Outlined="true">
+                bool isCurrentUserMissingSquad = currentUserId == member.UserId &&
+                                                 string.IsNullOrEmpty(member.SquadUrl);
+                <MudPaper Class="@($"pa-3{(isCurrentUserMissingSquad ? " participant-card-missing-squad" : string.Empty)}")"
+                          Elevation="0"
+                          Outlined="true">
                     <div class="participant-header">
                         <MudText Typo="Typo.subtitle1">@member.UserName</MudText>
                         @if (!string.IsNullOrEmpty(member.SquadUrl))

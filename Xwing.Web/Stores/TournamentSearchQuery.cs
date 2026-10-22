@@ -5,4 +5,5 @@ public sealed record TournamentSearchQuery
     public TournamentWhenFilter WhenFilter { get; init; } = TournamentWhenFilter.All;
     public TournamentSortField SortField { get; init; } = TournamentSortField.StartDate;
     public bool SortDescending { get; init; }
+    public int? CurrentUserId { get; init; }
 }

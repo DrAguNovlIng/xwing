@@ -65,7 +65,7 @@ public sealed class TournamentStore : ITournamentStore
             .ThenBy(t => t.Name)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
-        return await ToListItemsAsync(context, tournaments, cancellationToken).ConfigureAwait(false);
+        return await ToListItemsAsync(context, tournaments, currentUserId: null, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<TournamentListItem>> SearchAsync(
@@ -89,7 +89,7 @@ public sealed class TournamentStore : ITournamentStore
         };
         tournaments = ApplySort(tournaments, query.SortField, query.SortDescending);
         List<Tournament> results = await tournaments.ToListAsync(cancellationToken).ConfigureAwait(false);
-        return await ToListItemsAsync(context, results, cancellationToken).ConfigureAwait(false);
+        return await ToListItemsAsync(context, results, query.CurrentUserId, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<Tournament?> GetAsync(int tournamentId, CancellationToken cancellationToken)
@@ -385,6 +385,7 @@ public sealed class TournamentStore : ITournamentStore
     private static async Task<IReadOnlyList<TournamentListItem>> ToListItemsAsync(
         XwingDbContext context,
         List<Tournament> tournaments,
+        int? currentUserId,
         CancellationToken cancellationToken)
     {
         if (tournaments.Count == 0)
@@ -399,13 +400,40 @@ public sealed class TournamentStore : ITournamentStore
             .Select(g => new { g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Key, x => x.Count, cancellationToken)
             .ConfigureAwait(false);
+        Dictionary<int, TournamentParticipant> currentUserParticipants = [];
+        if (currentUserId is int userId)
+        {
+            List<TournamentParticipant> rows = await context.TournamentParticipants
+                .AsNoTracking()
+                .Where(p => p.UserId == userId && tournamentIds.Contains(p.TournamentId))
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+            currentUserParticipants = rows.ToDictionary(p => p.TournamentId);
+        }
+
         return tournaments
-            .Select(t => new TournamentListItem
+            .Select(t =>
             {
-                Tournament = t,
-                ParticipantCount = counts.GetValueOrDefault(t.TournamentId),
+                bool joined = currentUserParticipants.ContainsKey(t.TournamentId);
+                bool hasSquad = joined &&
+                                ParticipantHasSquad(currentUserParticipants[t.TournamentId]);
+                return new TournamentListItem
+                {
+                    Tournament = t,
+                    ParticipantCount = counts.GetValueOrDefault(t.TournamentId),
+                    CurrentUserJoined = joined,
+                    CurrentUserHasSquad = hasSquad,
+                };
             })
             .ToList();
+    }
+
+    private static bool ParticipantHasSquad(TournamentParticipant participant)
+    {
+        IReadOnlyList<SquadShipDisplay> ships = ParseSquadShipsJson(participant.SquadShipsJson);
+        return !string.IsNullOrEmpty(participant.SquadFaction) &&
+               ships.Count > 0 &&
+               !string.IsNullOrEmpty(participant.SquadUrl);
     }
 
     private static IQueryable<Tournament> ApplySort(
@@ -447,6 +475,8 @@ public sealed record TournamentListItem
 {
     public required Tournament Tournament { get; init; }
     public int ParticipantCount { get; init; }
+    public bool CurrentUserJoined { get; init; }
+    public bool CurrentUserHasSquad { get; init; }
 }
 
 public sealed record TournamentMember

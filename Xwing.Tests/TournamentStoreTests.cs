@@ -624,6 +624,67 @@ public sealed class TournamentStoreTests
         }
     }
 
+    [Fact]
+    public async Task SearchAsyncShouldIncludeCurrentUserJoinAndSquadFlags()
+    {
+        DateTimeOffset today = new(2026, 10, 15, 0, 0, 0, TimeSpan.Zero);
+        var timeProvider = new FixedTimeProvider(today);
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            timeProvider,
+            TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<UserAccount> user = await stores.Users.CreateAsync(
+                "player",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> noSquad = await stores.Tournaments.CreateAsync(
+                "No squad yet",
+                DefaultStart,
+                DefaultEnd,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> withSquad = await stores.Tournaments.CreateAsync(
+                "With squad",
+                DefaultStart,
+                DefaultEnd,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> notJoined = await stores.Tournaments.CreateAsync(
+                "Not joined",
+                DefaultStart,
+                DefaultEnd,
+                TestContext.Current.CancellationToken);
+            int userId = user.Value!.UserId;
+            await stores.Tournaments.JoinAsync(
+                noSquad.Value!.TournamentId,
+                userId,
+                TestContext.Current.CancellationToken);
+            await stores.Tournaments.JoinAsync(
+                withSquad.Value!.TournamentId,
+                userId,
+                TestContext.Current.CancellationToken);
+            Result saved = await stores.Tournaments.SetSquadAsync(
+                withSquad.Value.TournamentId,
+                userId,
+                SampleSquadJson,
+                TestContext.Current.CancellationToken);
+            saved.IsSuccess.ShouldBeTrue();
+            IReadOnlyList<TournamentListItem> results = await stores.Tournaments.SearchAsync(
+                new TournamentSearchQuery { WhenFilter = TournamentWhenFilter.All, CurrentUserId = userId },
+                TestContext.Current.CancellationToken);
+            TournamentListItem noSquadItem = results.Single(r => r.Tournament.TournamentId == noSquad.Value.TournamentId);
+            noSquadItem.CurrentUserJoined.ShouldBeTrue();
+            noSquadItem.CurrentUserHasSquad.ShouldBeFalse();
+            TournamentListItem withSquadItem = results.Single(r => r.Tournament.TournamentId == withSquad.Value.TournamentId);
+            withSquadItem.CurrentUserJoined.ShouldBeTrue();
+            withSquadItem.CurrentUserHasSquad.ShouldBeTrue();
+            TournamentListItem notJoinedItem = results.Single(r => r.Tournament.TournamentId == notJoined.Value!.TournamentId);
+            notJoinedItem.CurrentUserJoined.ShouldBeFalse();
+            notJoinedItem.CurrentUserHasSquad.ShouldBeFalse();
+        }
+    }
+
     private const string SampleSquadJson = """
         {
           "faction": "rebelalliance",

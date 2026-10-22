@@ -16,7 +16,6 @@
                    OnClick="@(() => Navigation.NavigateTo("/tournament-templates"))">
             Templates
         </MudButton>
-        <MudText Typo="Typo.h5">@pageTitle</MudText>
         <MudSpacer />
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
@@ -26,6 +25,7 @@
             Add match
         </MudButton>
     </MudToolBar>
+    <MudText Typo="Typo.h5">@pageTitle</MudText>
     @if (graph is not null)
     {
         <MudStack Row="true" Spacing="1" AlignItems="AlignItems.End" Wrap="Wrap.Wrap" Class="bracket-inline-controls">
@@ -116,26 +116,30 @@
                                  style="@GetBoxStyle(match.PositionX, match.PositionY)">
                                 <div class="template-match-drag-handle">
                                     <MudIcon Icon="@Icons.Material.Filled.DragIndicator" Size="Size.Small" />
-                                    <MudText Typo="Typo.subtitle2">@DisplayName(match)</MudText>
+                                    <div class="template-match-box-header">
+                                        <MudText Typo="Typo.subtitle2">@DisplayName(match)</MudText>
+                                    </div>
                                 </div>
-                                <MudText Typo="Typo.caption" Class="slot-line">A: @FormatSlot(match, TemplateMatchSlot.A)</MudText>
-                                <MudText Typo="Typo.caption" Class="slot-line">B: @FormatSlot(match, TemplateMatchSlot.B)</MudText>
+                                <MudText Typo="Typo.caption" Class="@GetSlotLineClass(match, TemplateMatchSlot.A)">A: @FormatSlot(match, TemplateMatchSlot.A)</MudText>
+                                <MudText Typo="Typo.caption" Class="@GetSlotLineClass(match, TemplateMatchSlot.B)">B: @FormatSlot(match, TemplateMatchSlot.B)</MudText>
                             </div>
                         }
                         int displayX = isDragging ? dragCellX : match.PositionX;
                         int displayY = isDragging ? dragCellY : match.PositionY;
                         <div class="template-match-box @(selectedMatch?.TemplateMatchId == match.TemplateMatchId ? "selected" : string.Empty) @(isDragging ? "dragging" : string.Empty)"
                              style="@GetBoxStyle(displayX, displayY)"
-                             @onpointerdown="@(e => SelectMatch(match))"
+                             @onpointerdown="@(async _ => await SelectMatchAsync(match))"
                              @onpointerdown:stopPropagation="true">
                             <div class="template-match-drag-handle"
                                  @onpointerdown="@(e => StartDrag(e, match))"
                                  @onpointerdown:stopPropagation="true">
                                 <MudIcon Icon="@Icons.Material.Filled.DragIndicator" Size="Size.Small" />
-                                <MudText Typo="Typo.subtitle2">@DisplayName(match)</MudText>
+                                <div class="template-match-box-header">
+                                    <MudText Typo="Typo.subtitle2">@DisplayName(match)</MudText>
+                                </div>
                             </div>
-                            <MudText Typo="Typo.caption" Class="slot-line">A: @FormatSlot(match, TemplateMatchSlot.A)</MudText>
-                            <MudText Typo="Typo.caption" Class="slot-line">B: @FormatSlot(match, TemplateMatchSlot.B)</MudText>
+                            <MudText Typo="Typo.caption" Class="@GetSlotLineClass(match, TemplateMatchSlot.A)">A: @FormatSlot(match, TemplateMatchSlot.A)</MudText>
+                            <MudText Typo="Typo.caption" Class="@GetSlotLineClass(match, TemplateMatchSlot.B)">B: @FormatSlot(match, TemplateMatchSlot.B)</MudText>
                         </div>
                     }
                 </div>
@@ -148,35 +152,27 @@
                                            aria-label="Close match editor"
                                            OnClick="CloseMatchEditor" />
                         </div>
-                        <MudTextField @bind-Value="editMatchName"
-                                      Label="Name"
-                                      Variant="Variant.Outlined"
-                                      Class="mb-3" />
-                        <MudButton Variant="Variant.Outlined"
-                                   Color="Color.Primary"
-                                   FullWidth="true"
-                                   Class="mb-2"
-                                   OnClick="SaveMatchNameAsync">
-                            Save name
-                        </MudButton>
+                        <div @onfocusin="OnMatchNameFocus">
+                            <MudTextField @bind-Value="editMatchName"
+                                          Label="Name"
+                                          Variant="Variant.Outlined"
+                                          Class="mb-3"
+                                          Immediate="true"
+                                          OnBlur="OnMatchNameBlurAsync" />
+                        </div>
                         <MudNumericField T="int?"
-                                         @bind-Value="editRoundNumber"
+                                         Value="editRoundNumber"
+                                         ValueChanged="OnEditRoundChangedAsync"
                                          Label="Round"
                                          Variant="Variant.Outlined"
                                          Min="1"
-                                         Class="mb-2" />
-                        <MudButton Variant="Variant.Outlined"
-                                   Color="Color.Primary"
-                                   FullWidth="true"
-                                   Class="mb-4"
-                                   OnClick="SaveMatchRoundAsync">
-                            Save round
-                        </MudButton>
+                                         Class="mb-4" />
                         <MudSelect T="string"
                                    Label="Slot A"
                                    Variant="Variant.Outlined"
                                    Value="@slotAValue"
                                    ValueChanged="OnSlotAChangedAsync"
+                                   ToStringFunc="FormatStructureSlotSelect"
                                    Class="mb-2">
                             <MudSelectItem Value="@OpenSlotValue">Custom entrant</MudSelectItem>
                             @foreach (TemplateMatch other in OtherMatches(selectedMatch))
@@ -193,11 +189,14 @@
                         </MudSelect>
                         @if (slotAValue == OpenSlotValue)
                         {
-                            <MudTextField @bind-Value="editSlotAOpenLabel"
-                                          Label="Slot A entrant text"
-                                          Variant="Variant.Outlined"
-                                          Class="mb-3"
-                                          OnBlur="SaveSlotAOpenLabelAsync" />
+                            <div @onfocusin="OnSlotAOpenLabelFocus">
+                                <MudTextField @bind-Value="editSlotAOpenLabel"
+                                              Label="Slot A entrant text"
+                                              Variant="Variant.Outlined"
+                                              Class="mb-3"
+                                              Immediate="true"
+                                              OnBlur="OnSlotAOpenLabelBlurAsync" />
+                            </div>
                         }
                         else
                         {
@@ -208,6 +207,7 @@
                                    Variant="Variant.Outlined"
                                    Value="@slotBValue"
                                    ValueChanged="OnSlotBChangedAsync"
+                                   ToStringFunc="FormatStructureSlotSelect"
                                    Class="mb-2">
                             <MudSelectItem Value="@OpenSlotValue">Custom entrant</MudSelectItem>
                             @foreach (TemplateMatch other in OtherMatches(selectedMatch))
@@ -224,11 +224,14 @@
                         </MudSelect>
                         @if (slotBValue == OpenSlotValue)
                         {
-                            <MudTextField @bind-Value="editSlotBOpenLabel"
-                                          Label="Slot B entrant text"
-                                          Variant="Variant.Outlined"
-                                          Class="mb-4"
-                                          OnBlur="SaveSlotBOpenLabelAsync" />
+                            <div @onfocusin="OnSlotBOpenLabelFocus">
+                                <MudTextField @bind-Value="editSlotBOpenLabel"
+                                              Label="Slot B entrant text"
+                                              Variant="Variant.Outlined"
+                                              Class="mb-4"
+                                              Immediate="true"
+                                              OnBlur="OnSlotBOpenLabelBlurAsync" />
+                            </div>
                         }
                         else
                         {
@@ -346,6 +349,10 @@
     private int dragCellX;
     private int dragCellY;
     private long? activePointerId;
+    private int? _boundMatchId;
+    private int? _nameFocusMatchId;
+    private int? _slotAOpenLabelFocusMatchId;
+    private int? _slotBOpenLabelFocusMatchId;
     protected override async Task OnParametersSetAsync()
     {
         await LoadGraphAsync();
@@ -384,7 +391,7 @@
         draggingMatchId == match.TemplateMatchId ? dragCellY : match.PositionY;
     private static string GetBoxStyle(int cellX, int cellY) =>
         $"left: {cellX * CellSize + BoxOffset}px; top: {cellY * CellSize + BoxOffset}px;";
-    private void SelectMatch(TemplateMatch match)
+    private async Task SelectMatchAsync(TemplateMatch match)
     {
         if (draggingMatchId is not null)
         {
@@ -397,6 +404,13 @@
             return;
         }
 
+        if (_boundMatchId is int previousId && previousId != match.TemplateMatchId)
+        {
+            SidePanelSnapshot snapshot = CaptureSidePanelSnapshot();
+            ClearFieldFocusMatchIds();
+            await ApplySidePanelSnapshotAsync(previousId, snapshot);
+        }
+
         selectedMatch = match;
         matchEditorOpen = true;
         SyncSidePanel();
@@ -407,27 +421,112 @@
     {
         if (selectedMatch is null || graph is null)
         {
+            _boundMatchId = null;
             return;
         }
+
         editMatchName = selectedMatch.Name ?? string.Empty;
         slotAValue = GetSlotSelectValue(selectedMatch, TemplateMatchSlot.A);
         slotBValue = GetSlotSelectValue(selectedMatch, TemplateMatchSlot.B);
         editSlotAOpenLabel = selectedMatch.SlotAOpenLabel ?? string.Empty;
         editSlotBOpenLabel = selectedMatch.SlotBOpenLabel ?? string.Empty;
         editRoundNumber = selectedMatch.RoundNumber;
+        _boundMatchId = selectedMatch.TemplateMatchId;
     }
 
-    private async Task SaveMatchRoundAsync()
+    private sealed record SidePanelSnapshot(
+        string MatchName,
+        int? RoundNumber,
+        string SlotAValue,
+        string SlotBValue,
+        string SlotAOpenLabel,
+        string SlotBOpenLabel);
+
+    private SidePanelSnapshot CaptureSidePanelSnapshot() =>
+        new(
+            editMatchName,
+            editRoundNumber,
+            slotAValue,
+            slotBValue,
+            editSlotAOpenLabel,
+            editSlotBOpenLabel);
+
+    private TemplateMatch? FindMatchById(int matchId) =>
+        graph?.Matches.FirstOrDefault(m => m.TemplateMatchId == matchId);
+
+    private async Task ApplySidePanelSnapshotAsync(int matchId, SidePanelSnapshot snapshot)
     {
-        if (selectedMatch is null)
+        TemplateMatch? match = FindMatchById(matchId);
+        if (match is null)
+        {
+            return;
+        }
+
+        await SaveMatchNameForAsync(match, snapshot.MatchName);
+        match = FindMatchById(matchId);
+        if (match is null)
+        {
+            return;
+        }
+
+        await SaveMatchRoundForAsync(match, snapshot.RoundNumber);
+        match = FindMatchById(matchId);
+        if (match is null)
+        {
+            return;
+        }
+
+        if (snapshot.SlotAValue == OpenSlotValue)
+        {
+            await SaveSlotOpenLabelForAsync(match, TemplateMatchSlot.A, snapshot.SlotAOpenLabel);
+            match = FindMatchById(matchId);
+        }
+
+        if (match is not null && snapshot.SlotBValue == OpenSlotValue)
+        {
+            await SaveSlotOpenLabelForAsync(match, TemplateMatchSlot.B, snapshot.SlotBOpenLabel);
+        }
+    }
+
+    private TemplateMatch? RefreshMatch(TemplateMatch match) =>
+        graph?.Matches.FirstOrDefault(m => m.TemplateMatchId == match.TemplateMatchId);
+
+    private async Task SaveMatchNameForAsync(TemplateMatch match, string name)
+    {
+        match = RefreshMatch(match) ?? match;
+        string trimmed = name.Trim();
+        string? current = match.Name;
+        if (string.Equals(current?.Trim(), trimmed, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        Result<TemplateMatch> result = await TemplateStore.UpdateMatchNameAsync(
+            match.TemplateMatchId,
+            trimmed,
+            match.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Could not save name.", Severity.Error);
+            return;
+        }
+
+        await LoadGraphAsync();
+    }
+
+    private async Task SaveMatchRoundForAsync(TemplateMatch match, int? round)
+    {
+        match = RefreshMatch(match) ?? match;
+        if (round == match.RoundNumber)
         {
             return;
         }
 
         Result<TemplateMatch> result = await TemplateStore.UpdateMatchRoundAsync(
-            selectedMatch.TemplateMatchId,
-            editRoundNumber,
-            selectedMatch.RowVersion,
+            match.TemplateMatchId,
+            round,
+            match.RowVersion,
             CancellationToken.None);
         if (!result.IsSuccess)
         {
@@ -436,6 +535,124 @@
         }
 
         await LoadGraphAsync();
+    }
+
+    private async Task OnEditRoundChangedAsync(int? value)
+    {
+        int? boundId = _boundMatchId;
+        editRoundNumber = value;
+        if (boundId is not int matchId)
+        {
+            return;
+        }
+
+        TemplateMatch? match = FindMatchById(matchId);
+        if (match is null)
+        {
+            return;
+        }
+
+        await SaveMatchRoundForAsync(match, value);
+    }
+
+    private async Task SaveSlotOpenLabelForAsync(TemplateMatch match, TemplateMatchSlot slot, string label)
+    {
+        match = RefreshMatch(match) ?? match;
+        string? current = slot == TemplateMatchSlot.A ? match.SlotAOpenLabel : match.SlotBOpenLabel;
+        string trimmed = label.Trim();
+        if (string.IsNullOrWhiteSpace(current) && string.IsNullOrWhiteSpace(trimmed))
+        {
+            return;
+        }
+
+        if (string.Equals(current?.Trim(), trimmed, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        Result<TemplateMatch> result = await TemplateStore.UpdateSlotOpenLabelAsync(
+            match.TemplateMatchId,
+            slot,
+            trimmed,
+            match.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Could not save entrant text.", Severity.Error);
+            return;
+        }
+
+        await LoadGraphAsync();
+    }
+
+    private void ClearFieldFocusMatchIds()
+    {
+        _nameFocusMatchId = null;
+        _slotAOpenLabelFocusMatchId = null;
+        _slotBOpenLabelFocusMatchId = null;
+    }
+
+    private void OnMatchNameFocus(FocusEventArgs e) =>
+        _nameFocusMatchId = _boundMatchId;
+
+    private void OnSlotAOpenLabelFocus(FocusEventArgs e) =>
+        _slotAOpenLabelFocusMatchId = _boundMatchId;
+
+    private void OnSlotBOpenLabelFocus(FocusEventArgs e) =>
+        _slotBOpenLabelFocusMatchId = _boundMatchId;
+
+    private async Task OnMatchNameBlurAsync(FocusEventArgs _)
+    {
+        int? matchId = _nameFocusMatchId;
+        _nameFocusMatchId = null;
+        if (matchId is not int id || id != _boundMatchId)
+        {
+            return;
+        }
+
+        TemplateMatch? match = FindMatchById(id);
+        if (match is null)
+        {
+            return;
+        }
+
+        await SaveMatchNameForAsync(match, editMatchName);
+    }
+
+    private async Task OnSlotAOpenLabelBlurAsync(FocusEventArgs _)
+    {
+        int? matchId = _slotAOpenLabelFocusMatchId;
+        _slotAOpenLabelFocusMatchId = null;
+        if (matchId is not int id)
+        {
+            return;
+        }
+
+        TemplateMatch? match = FindMatchById(id);
+        if (match is null)
+        {
+            return;
+        }
+
+        await SaveSlotOpenLabelForAsync(match, TemplateMatchSlot.A, editSlotAOpenLabel);
+    }
+
+    private async Task OnSlotBOpenLabelBlurAsync(FocusEventArgs _)
+    {
+        int? matchId = _slotBOpenLabelFocusMatchId;
+        _slotBOpenLabelFocusMatchId = null;
+        if (matchId is not int id)
+        {
+            return;
+        }
+
+        TemplateMatch? match = FindMatchById(id);
+        if (match is null)
+        {
+            return;
+        }
+
+        await SaveSlotOpenLabelForAsync(match, TemplateMatchSlot.B, editSlotBOpenLabel);
     }
 
     private Task saveGraphSizeQueue = Task.CompletedTask;
@@ -543,6 +760,43 @@
             : $"Loser of {sourceName}";
     }
 
+    private string GetSlotLineClass(TemplateMatch match, TemplateMatchSlot slot)
+    {
+        const string baseClass = "slot-line";
+        TemplateMatchFeed? feed = graph!.Feeds.SingleOrDefault(
+            f => f.TargetTemplateMatchId == match.TemplateMatchId && f.TargetSlot == slot);
+        if (feed is null)
+        {
+            return baseClass;
+        }
+
+        return feed.SourceOutcome == TemplateFeedOutcome.Winner
+            ? $"{baseClass} slot-outcome-winner"
+            : $"{baseClass} slot-outcome-loser";
+    }
+
+    private string FormatStructureSlotSelect(string value)
+    {
+        if (value == OpenSlotValue)
+        {
+            return "Custom entrant";
+        }
+
+        if (TryParseSlotValue(value, out int? sourceId, out TemplateFeedOutcome? outcome) &&
+            sourceId is not null &&
+            outcome is not null &&
+            graph is not null)
+        {
+            TemplateMatch? source = graph.Matches.FirstOrDefault(m => m.TemplateMatchId == sourceId);
+            string sourceName = source is null ? "?" : DisplayName(source);
+            return outcome == TemplateFeedOutcome.Winner
+                ? $"Winner of {sourceName}"
+                : $"Loser of {sourceName}";
+        }
+
+        return value;
+    }
+
     private (double X, double Y) GetSourceAnchor(int sourceMatchId)
     {
         TemplateMatch match = graph!.Matches.Single(m => m.TemplateMatchId == sourceMatchId);
@@ -633,60 +887,8 @@
         SyncSidePanel();
     }
 
-    private async Task SaveMatchNameAsync()
-    {
-        if (selectedMatch is null)
-        {
-            return;
-        }
-        Result<TemplateMatch> result = await TemplateStore.UpdateMatchNameAsync(
-            selectedMatch.TemplateMatchId,
-            editMatchName,
-            selectedMatch.RowVersion,
-            CancellationToken.None);
-        if (!result.IsSuccess)
-        {
-            ShowStatus(result.Error ?? "Could not save name.", Severity.Error);
-            return;
-        }
-        await LoadGraphAsync();
-    }
-
     private async Task OnSlotAChangedAsync(string value) => await SetSlotAsync(TemplateMatchSlot.A, value);
     private async Task OnSlotBChangedAsync(string value) => await SetSlotAsync(TemplateMatchSlot.B, value);
-    private async Task SaveSlotAOpenLabelAsync() =>
-        await SaveSlotOpenLabelAsync(TemplateMatchSlot.A, editSlotAOpenLabel);
-    private async Task SaveSlotBOpenLabelAsync() =>
-        await SaveSlotOpenLabelAsync(TemplateMatchSlot.B, editSlotBOpenLabel);
-    private async Task SaveSlotOpenLabelAsync(TemplateMatchSlot slot, string label)
-    {
-        if (selectedMatch is null || graph is null)
-        {
-            return;
-        }
-        string? current = slot == TemplateMatchSlot.A ? selectedMatch.SlotAOpenLabel : selectedMatch.SlotBOpenLabel;
-        string trimmed = label.Trim();
-        if (string.IsNullOrWhiteSpace(current) && string.IsNullOrWhiteSpace(trimmed))
-        {
-            return;
-        }
-        if (string.Equals(current?.Trim(), trimmed, StringComparison.Ordinal))
-        {
-            return;
-        }
-        Result<TemplateMatch> result = await TemplateStore.UpdateSlotOpenLabelAsync(
-            selectedMatch.TemplateMatchId,
-            slot,
-            trimmed,
-            selectedMatch.RowVersion,
-            CancellationToken.None);
-        if (!result.IsSuccess)
-        {
-            ShowStatus(result.Error ?? "Could not save entrant text.", Severity.Error);
-            return;
-        }
-        await LoadGraphAsync();
-    }
 
     private async Task SetSlotAsync(TemplateMatchSlot slot, string value)
     {
@@ -745,6 +947,18 @@
         {
             return;
         }
+
+        if (_boundMatchId is int boundId)
+        {
+            await ApplySidePanelSnapshotAsync(boundId, CaptureSidePanelSnapshot());
+        }
+
+        selectedMatch = FindMatchById(selectedMatch.TemplateMatchId);
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
         Result result = await TemplateStore.DeleteMatchAsync(
             selectedMatch.TemplateMatchId,
             selectedMatch.RowVersion,

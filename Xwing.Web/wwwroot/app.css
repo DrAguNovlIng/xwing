@@ -92,6 +92,11 @@ h1:focus {
     flex-wrap: wrap;
 }
 
+.participant-card-missing-squad {
+    border-color: var(--mud-palette-warning) !important;
+    border-width: 2px;
+}
+
 .tournament-details-summary {
     display: flex;
     flex-wrap: wrap;
@@ -399,4 +404,72 @@ h1:focus {
 .slot-line.slot-outcome-loser {
     color: var(--mud-palette-warning);
     font-weight: 600;
+}
+
+.tournament-list-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tournament-list-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tournament-list-card-name {
+    display: block;
+    min-width: 0;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.tournament-list-name-cell {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.tournament-list-card-status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tournament-list-card-results {
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.tournament-list-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    color: var(--mud-palette-text-secondary);
+    font-size: 0.8125rem;
+    line-height: 1.3;
+}
+
+.tournament-list-card-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tournament-list-card-meta-icon {
+    opacity: 0.85;
+}
+
+.tournament-list-card-dates {
+    flex-wrap: wrap;
+}
+
+.tournament-list-card-date-arrow {
+    opacity: 0.75;
+    font-size: 1rem !important;
 }
