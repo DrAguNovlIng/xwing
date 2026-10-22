@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  body { margin: 0; }
+  .stack { display: flex; flex-direction: column; }
+  .surface { position: relative; box-sizing: content-box; border: 1px solid #000; width: 1200px; height: 200px; max-width: 1200px; background: #ddd; }
+  .clip { overflow: clip; align-self: flex-start; }
+  .abs { position: absolute; top: 0; left: 0; }
+  .wrap { width: 100%; min-width: 0; }
+  #out { white-space: pre; }
+</style>
+</head>
+<body>
+<div class="stack" id="a">
+  <div class="surface clip" id="sa"><svg class="abs" width="1200" height="200"></svg></div>
+</div>
+<div class="stack" id="b">
+  <div class="surface" id="sb"><svg width="1200" height="200"></svg></div>
+</div>
+<div class="stack" id="c">
+  <div class="wrap"><div class="surface" id="sc"><svg class="abs" width="1200" height="200"></svg></div></div>
+</div>
+<pre id="out"></pre>
+<script>
+  function m(id, sid) {
+    const s = document.getElementById(sid);
+    const p = document.getElementById(id);
+    return { id, surfaceH: s.offsetHeight, parentH: p.offsetHeight, parentW: p.offsetWidth };
+  }
+  const de = document.documentElement;
+  document.getElementById('out').textContent = JSON.stringify({
+    innerW: innerWidth,
+    scroll: [de.scrollWidth, de.scrollHeight],
+    clientH: de.clientHeight,
+    vscroll: de.scrollHeight - de.clientHeight,
+    a: m('a','sa'),
+    b: m('b','sb'),
+    c: m('c','sc')
+  });
+</script>
+</body>
+</html>

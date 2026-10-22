@@ -1,4 +1,10 @@
 @page "/settings"
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Xwing.Web.Components.Dialogs
+@inject IUserStore UserStore
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IDialogService DialogService
 <PageTitle>Settings</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-2">Settings</MudText>
@@ -11,12 +17,146 @@
     <MudRadio T="ThemePreference" Value="ThemePreference.Dark" Color="Color.Primary">Dark</MudRadio>
 </MudRadioGroup>
 
+@if (isSignedIn)
+{
+    <MudDivider Class="my-6" />
+    <MudText Typo="Typo.subtitle1" Class="mb-4">Password</MudText>
+    @if (!string.IsNullOrEmpty(passwordMessage))
+    {
+        <MudAlert Severity="@passwordMessageSeverity" Class="mb-4" Dense="true">@passwordMessage</MudAlert>
+    }
+    <MudStack Spacing="3" Style="max-width: 24rem;">
+        <MudTextField @bind-Value="currentPassword"
+                      Label="Current password"
+                      InputType="InputType.Password"
+                      Variant="Variant.Outlined"
+                      Required="true" />
+        <MudTextField @bind-Value="newPassword"
+                      Label="New password"
+                      InputType="InputType.Password"
+                      Variant="Variant.Outlined"
+                      Required="true" />
+        <MudTextField @bind-Value="confirmNewPassword"
+                      Label="Confirm new password"
+                      InputType="InputType.Password"
+                      Variant="Variant.Outlined"
+                      Required="true" />
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="passwordChangeInProgress"
+                   OnClick="ChangePasswordAsync">
+            Update password
+        </MudButton>
+    </MudStack>
+}
+
 @code {
+    private static readonly DialogOptions confirmDialogOptions = new()
+    {
+        CloseButton = true,
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+    };
+
     [CascadingParameter]
     public ThemePreferenceState ThemeState { get; set; } = default!;
+
+    private bool isSignedIn;
+
+    private int? currentUserId;
+
+    private string currentPassword = string.Empty;
+
+    private string newPassword = string.Empty;
+
+    private string confirmNewPassword = string.Empty;
+
+    private string? passwordMessage;
+
+    private Severity passwordMessageSeverity = Severity.Info;
+
+    private bool passwordChangeInProgress;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync().ConfigureAwait(false);
+        isSignedIn = authState.User.Identity?.IsAuthenticated == true;
+        currentUserId = TryGetUserId(authState.User);
+    }
+
+    private static int? TryGetUserId(ClaimsPrincipal user)
+    {
+        string? idValue = user.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (int.TryParse(idValue, out int userId))
+        {
+            return userId;
+        }
+
+        return null;
+    }
 
     private async Task OnPreferenceChangedAsync(ThemePreference preference)
     {
         await ThemeState.SetPreferenceAsync(preference);
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        passwordMessage = null;
+        if (string.IsNullOrWhiteSpace(newPassword))
+        {
+            passwordMessage = "New password is required.";
+            passwordMessageSeverity = Severity.Error;
+            return;
+        }
+
+        if (!string.Equals(newPassword, confirmNewPassword, StringComparison.Ordinal))
+        {
+            passwordMessage = "New password and confirmation do not match.";
+            passwordMessageSeverity = Severity.Error;
+            return;
+        }
+
+        if (currentUserId is null)
+        {
+            passwordMessage = "You must be signed in to change your password.";
+            passwordMessageSeverity = Severity.Error;
+            return;
+        }
+
+        IDialogReference dialog = await DialogService.ShowAsync<ChangePasswordConfirmDialog>(
+            "Change password",
+            confirmDialogOptions);
+        DialogResult? dialogResult = await dialog.Result;
+        if (dialogResult is null || dialogResult.Canceled)
+        {
+            return;
+        }
+
+        passwordChangeInProgress = true;
+        try
+        {
+            Result result = await UserStore.ChangePasswordAsync(
+                currentUserId.Value,
+                currentPassword,
+                newPassword,
+                CancellationToken.None);
+            if (!result.IsSuccess)
+            {
+                passwordMessage = result.Error;
+                passwordMessageSeverity = Severity.Error;
+                return;
+            }
+
+            currentPassword = string.Empty;
+            newPassword = string.Empty;
+            confirmNewPassword = string.Empty;
+            passwordMessage = "Password updated.";
+            passwordMessageSeverity = Severity.Success;
+        }
+        finally
+        {
+            passwordChangeInProgress = false;
+        }
     }
 }

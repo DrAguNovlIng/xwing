@@ -127,6 +127,16 @@ namespace Xwing.Web.Data.Migrations
                     b.Property<DateTimeOffset>("EndDateUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<int>("GraphHeightCells")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(30);
+
+                    b.Property<int>("GraphWidthCells")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(30);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -335,6 +345,16 @@ namespace Xwing.Web.Data.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TournamentTemplateId"));
+
+                    b.Property<int>("GraphHeightCells")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(30);
+
+                    b.Property<int>("GraphWidthCells")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(30);
 
                     b.Property<string>("Name")
                         .IsRequired()

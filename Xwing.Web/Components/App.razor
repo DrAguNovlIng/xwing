@@ -8,6 +8,23 @@
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["Xwing.Web.styles.css"]" />
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <style>
+        :root {
+            color-scheme: var(--mud-native-html-color-scheme, dark);
+            --mud-native-html-color-scheme: dark;
+            --mud-palette-background: #32333d;
+            --mud-palette-background-gray: #27272f;
+            --mud-palette-surface: #373740;
+            --mud-palette-appbar-background: #27272f;
+            --mud-palette-appbar-text: rgba(255, 255, 255, 0.70);
+            --mud-palette-drawer-background: #27272f;
+            --mud-palette-drawer-text: rgba(255, 255, 255, 0.50);
+            --mud-palette-drawer-icon: rgba(255, 255, 255, 0.50);
+            --mud-palette-text-primary: rgba(255, 255, 255, 0.70);
+            --mud-palette-text-secondary: rgba(255, 255, 255, 0.50);
+            --mud-palette-lines-default: rgba(255, 255, 255, 0.12);
+        }
+    </style>
     <link href="https://yasb.app/fonts/xwing-miniatures.css" rel="stylesheet" />
     <ImportMap />
     <HeadOutlet @rendermode="InteractiveServer" />

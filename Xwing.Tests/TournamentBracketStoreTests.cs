@@ -58,6 +58,42 @@ public sealed class TournamentBracketStoreTests
     }
 
     [Fact]
+    public async Task AssignTemplateShouldCopyGraphSize()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<TournamentTemplate> template = await stores.Templates.CreateAsync(
+                "Sized",
+                TestContext.Current.CancellationToken);
+            Result<TournamentTemplate> resized = await stores.Templates.UpdateGraphSizeAsync(
+                template.Value!.TournamentTemplateId,
+                42,
+                24,
+                template.Value.RowVersion,
+                TestContext.Current.CancellationToken);
+            resized.IsSuccess.ShouldBeTrue();
+            Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+                "Event",
+                DefaultStart,
+                DefaultEnd,
+                TestContext.Current.CancellationToken);
+            Result assigned = await stores.Brackets.AssignTemplateAsync(
+                tournament.Value!.TournamentId,
+                template.Value.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            assigned.IsSuccess.ShouldBeTrue();
+            Result<TournamentBracketGraph> graph = await stores.Brackets.GetGraphAsync(
+                tournament.Value.TournamentId,
+                TestContext.Current.CancellationToken);
+            graph.Value!.Tournament.GraphWidthCells.ShouldBe(42);
+            graph.Value.Tournament.GraphHeightCells.ShouldBe(24);
+        }
+    }
+
+    [Fact]
     public async Task UpdateMatchResultShouldRejectWinnerWithoutPlayer()
     {
         TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(

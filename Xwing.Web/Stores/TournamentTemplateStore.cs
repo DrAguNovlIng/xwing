@@ -73,7 +73,12 @@ public sealed class TournamentTemplateStore : ITournamentTemplateStore
             return Result.Fail<TournamentTemplate>("Name is required.");
         }
         await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-        var template = new TournamentTemplate { Name = name.Trim() };
+        var template = new TournamentTemplate
+        {
+            Name = name.Trim(),
+            GraphWidthCells = BracketGraphLayout.DefaultGraphWidthCells,
+            GraphHeightCells = BracketGraphLayout.DefaultGraphHeightCells,
+        };
         context.TournamentTemplates.Add(template);
         Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
         if (!saveResult.IsSuccess)
@@ -108,6 +113,40 @@ public sealed class TournamentTemplateStore : ITournamentTemplateStore
         {
             return Result.Fail<TournamentTemplate>(saveResult.Error!);
         }
+        return Result.Ok(template);
+    }
+
+    public async Task<Result<TournamentTemplate>> UpdateGraphSizeAsync(
+        int tournamentTemplateId,
+        int graphWidthCells,
+        int graphHeightCells,
+        byte[] rowVersion,
+        CancellationToken cancellationToken)
+    {
+        Result? validation = BracketGraphLayout.ValidateGraphSize(graphWidthCells, graphHeightCells);
+        if (validation is not null)
+        {
+            return Result.Fail<TournamentTemplate>(validation.Error!);
+        }
+
+        await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        TournamentTemplate? template = await context.TournamentTemplates
+            .SingleOrDefaultAsync(t => t.TournamentTemplateId == tournamentTemplateId, cancellationToken)
+            .ConfigureAwait(false);
+        if (template is null)
+        {
+            return Result.Fail<TournamentTemplate>("Template not found.");
+        }
+
+        template.GraphWidthCells = graphWidthCells;
+        template.GraphHeightCells = graphHeightCells;
+        context.Entry(template).Property(e => e.RowVersion).OriginalValue = rowVersion;
+        Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
+        if (!saveResult.IsSuccess)
+        {
+            return Result.Fail<TournamentTemplate>(saveResult.Error!);
+        }
+
         return Result.Ok(template);
     }
 
