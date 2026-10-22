@@ -1,4 +1,4 @@
-@page "/tournaments/{TournamentId:int}/edit"
+﻿@page "/tournaments/{TournamentId:int}/edit"
 
 @attribute [Authorize(Roles = UserRoles.Admin)]
 
@@ -32,7 +32,7 @@
     <MudText Typo="Typo.h5">@pageTitle</MudText>
     @if (graph is not null)
     {
-        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.End" Wrap="Wrap.Wrap" Class="mb-2">
+        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.End" Wrap="Wrap.Wrap" Class="mb-2 bracket-inline-controls">
             <MudSelect T="int?"
                        Label="Apply template"
                        Variant="Variant.Outlined"
@@ -45,22 +45,24 @@
                     <MudSelectItem T="int?" Value="@template.TournamentTemplateId">@template.Name</MudSelectItem>
                 }
             </MudSelect>
-            <MudNumericField T="int"
-                             @bind-Value="editGraphWidthCells"
-                             @bind-Value:after="SaveGraphSizeAsync"
-                             Label="Canvas width (cells)"
-                             Variant="Variant.Outlined"
-                             Min="@BracketGraphLayout.MinGraphCells"
-                             Max="@BracketGraphLayout.MaxGraphCells"
-                             Style="max-width: 10rem;" />
-            <MudNumericField T="int"
-                             @bind-Value="editGraphHeightCells"
-                             @bind-Value:after="SaveGraphSizeAsync"
-                             Label="Canvas height (cells)"
-                             Variant="Variant.Outlined"
-                             Min="@BracketGraphLayout.MinGraphCells"
-                             Max="@BracketGraphLayout.MaxGraphCells"
-                             Style="max-width: 10rem;" />
+            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.End" Class="bracket-inline-controls">
+                <MudNumericField T="int"
+                                 @bind-Value="editGraphWidthCells"
+                                 @bind-Value:after="SaveGraphSizeAsync"
+                                 Label="Canvas width (cells)"
+                                 Variant="Variant.Outlined"
+                                 Min="@BracketGraphLayout.MinGraphCells"
+                                 Max="@BracketGraphLayout.MaxGraphCells"
+                                 Style="max-width: 10rem;" />
+                <MudNumericField T="int"
+                                 @bind-Value="editGraphHeightCells"
+                                 @bind-Value:after="SaveGraphSizeAsync"
+                                 Label="Canvas height (cells)"
+                                 Variant="Variant.Outlined"
+                                 Min="@BracketGraphLayout.MinGraphCells"
+                                 Max="@BracketGraphLayout.MaxGraphCells"
+                                 Style="max-width: 10rem;" />
+            </MudStack>
         </MudStack>
     }
     @if (!string.IsNullOrEmpty(statusMessage))
@@ -73,6 +75,7 @@
     }
     else
     {
+        <TournamentStandingsPanel Participants="graph.Participants" Matches="graph.Matches" />
         <div class="bracket-editor-stage">
                 <div class="template-graph-surface @(draggingMatchId is not null ? "template-graph-surface-dragging" : string.Empty)"
                      style="@SurfaceStyle"

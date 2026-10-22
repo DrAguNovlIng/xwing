@@ -1,0 +1,63 @@
+@using Xwing.Web.Data
+@using Xwing.Web.Stores
+
+<MudExpansionPanels Elevation="1" Class="tournament-standings-panel">
+    <MudExpansionPanel Text="Standings">
+        <MudStack Spacing="2">
+            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Class="bracket-inline-controls">
+                <MudNumericField T="int?"
+                                 @bind-Value="minRoundInclusive"
+                                 Label="Min round"
+                                 Variant="Variant.Outlined"
+                                 Min="1"
+                                 Style="max-width: 8rem;" />
+                <MudNumericField T="int?"
+                                 @bind-Value="maxRoundInclusive"
+                                 Label="Max round"
+                                 Variant="Variant.Outlined"
+                                 Min="1"
+                                 Style="max-width: 8rem;" />
+                <MudCheckBox T="bool"
+                             @bind-Value="includeMatchesWithoutRound"
+                             Label="Include matches without a round"
+                             Color="Color.Primary" />
+            </MudStack>
+            <MudTable Items="StandingsRows" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    <MudTh>Player</MudTh>
+                    <MudTh Style="text-align: right;">Wins</MudTh>
+                    <MudTh Style="text-align: right;">Losses</MudTh>
+                    <MudTh Style="text-align: right;">Played</MudTh>
+                    <MudTh Style="text-align: right;">Points</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Player">@context.UserName</MudTd>
+                    <MudTd DataLabel="Wins" Style="text-align: right;">@context.Wins</MudTd>
+                    <MudTd DataLabel="Losses" Style="text-align: right;">@context.Losses</MudTd>
+                    <MudTd DataLabel="Played" Style="text-align: right;">@context.MatchesPlayed</MudTd>
+                    <MudTd DataLabel="Points" Style="text-align: right;">@context.Points</MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudStack>
+    </MudExpansionPanel>
+</MudExpansionPanels>
+
+@code {
+    [Parameter]
+    public IReadOnlyList<TournamentBracketParticipant> Participants { get; set; } = [];
+
+    [Parameter]
+    public IReadOnlyList<TournamentMatch> Matches { get; set; } = [];
+
+    private int? minRoundInclusive;
+
+    private int? maxRoundInclusive;
+
+    private bool includeMatchesWithoutRound = true;
+
+    private IReadOnlyList<TournamentStandingsRow> StandingsRows =>
+        TournamentStandings.Calculate(
+            Participants,
+            Matches,
+            new TournamentStandingsFilter(minRoundInclusive, maxRoundInclusive, includeMatchesWithoutRound));
+}

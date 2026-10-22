@@ -8,6 +8,7 @@
 @inject ITournamentBracketStore BracketStore
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@implements IDisposable
 
 <PageTitle>@pageTitle</PageTitle>
 
@@ -19,6 +20,15 @@
             Tournament
         </MudButton>
         <MudSpacer />
+        @if (graph is not null)
+        {
+            <MudCheckBox T="bool"
+                         Value="liveUpdatesEnabled"
+                         ValueChanged="OnLiveUpdatesChangedAsync"
+                         Label="Live updates"
+                         Color="Color.Primary"
+                         Class="mr-2" />
+        }
         @if (isAdmin)
         {
             <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="@($"/tournaments/{TournamentId}/edit")">
@@ -35,12 +45,15 @@
     {
         <MudText>Tournament not found.</MudText>
     }
-    else if (graph.Matches.Count == 0)
-    {
-        <MudText>No bracket has been set up for this tournament yet.</MudText>
-    }
     else
     {
+        <TournamentStandingsPanel Participants="graph.Participants" Matches="graph.Matches" />
+        @if (graph.Matches.Count == 0)
+        {
+            <MudText>No bracket has been set up for this tournament yet.</MudText>
+        }
+        else
+        {
         <div class="results-canvas-frame">
         <div class="template-graph-surface" style="@SurfaceStyle">
             <svg class="template-graph-edges" width="@surfaceWidth" height="@surfaceHeight" xmlns="http://www.w3.org/2000/svg">
@@ -100,6 +113,7 @@
             }
         </div>
         </div>
+        }
     }
 </MudStack>
 
@@ -108,21 +122,110 @@
     private const int BoxOffset = 6;
     private const int BoxWidth = 168;
     private const int BoxHeight = 88;
+    private static readonly TimeSpan LiveUpdateInterval = TimeSpan.FromSeconds(5);
     [Parameter]
     public int TournamentId { get; set; }
     private TournamentBracketGraph? graph;
     private string pageTitle = "Results";
     private bool loading = true;
     private bool isAdmin;
+    private bool liveUpdatesEnabled;
+    private PeriodicTimer? liveUpdateTimer;
+    private CancellationTokenSource? liveUpdateCts;
     protected override async Task OnParametersSetAsync()
     {
+        await StopLiveUpdatesAsync().ConfigureAwait(false);
         loading = true;
         AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         isAdmin = authState.User.IsInRole(UserRoles.Admin);
-        Result<TournamentBracketGraph> result = await BracketStore.GetGraphAsync(TournamentId, CancellationToken.None);
+        await LoadGraphAsync(showLoading: false).ConfigureAwait(false);
+        loading = false;
+        if (liveUpdatesEnabled)
+        {
+            StartLiveUpdates();
+        }
+    }
+
+    public void Dispose()
+    {
+        liveUpdateCts?.Cancel();
+        liveUpdateCts?.Dispose();
+        liveUpdateTimer?.Dispose();
+    }
+
+    private async Task OnLiveUpdatesChangedAsync(bool enabled)
+    {
+        liveUpdatesEnabled = enabled;
+        if (enabled)
+        {
+            await LoadGraphAsync(showLoading: false).ConfigureAwait(false);
+            StartLiveUpdates();
+            return;
+        }
+
+        await StopLiveUpdatesAsync().ConfigureAwait(false);
+    }
+
+    private async Task LoadGraphAsync(bool showLoading)
+    {
+        if (showLoading)
+        {
+            loading = true;
+        }
+
+        Result<TournamentBracketGraph> result = await BracketStore.GetGraphAsync(TournamentId, CancellationToken.None)
+            .ConfigureAwait(false);
         graph = result.IsSuccess ? result.Value : null;
         pageTitle = graph is null ? "Results" : $"{graph.Tournament.Name} — Results";
-        loading = false;
+        if (showLoading)
+        {
+            loading = false;
+        }
+    }
+
+    private void StartLiveUpdates()
+    {
+        if (liveUpdateTimer is not null)
+        {
+            return;
+        }
+
+        liveUpdateCts = new CancellationTokenSource();
+        liveUpdateTimer = new PeriodicTimer(LiveUpdateInterval);
+        _ = RunLiveUpdateLoopAsync(liveUpdateCts.Token);
+    }
+
+    private async Task StopLiveUpdatesAsync()
+    {
+        if (liveUpdateCts is not null)
+        {
+            await liveUpdateCts.CancelAsync().ConfigureAwait(false);
+            liveUpdateCts.Dispose();
+            liveUpdateCts = null;
+        }
+
+        liveUpdateTimer?.Dispose();
+        liveUpdateTimer = null;
+    }
+
+    private async Task RunLiveUpdateLoopAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (liveUpdateTimer is not null &&
+                   await liveUpdateTimer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            {
+                await InvokeAsync(async () =>
+                {
+                    await LoadGraphAsync(showLoading: false).ConfigureAwait(false);
+                    StateHasChanged();
+                }).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Live updates stopped when the page is disposed or the checkbox is cleared.
+        }
     }
 
     private int surfaceWidth => graph is null

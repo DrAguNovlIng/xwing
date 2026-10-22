@@ -169,6 +169,18 @@ h1:focus {
     align-self: flex-start;
 }
 
+.bracket-inline-controls {
+    row-gap: 8px;
+}
+
+.bracket-inline-controls > .mud-input-control,
+.bracket-inline-controls > .mud-select,
+.bracket-inline-controls > .mud-checkbox {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 100%;
+}
+
 .bracket-match-editor-panel {
     position: fixed;
     top: calc(var(--mud-appbar-height, 64px) + 12px);
