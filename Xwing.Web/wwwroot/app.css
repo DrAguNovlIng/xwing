@@ -37,6 +37,53 @@ h1:focus {
     text-align: start;
 }
 
+.login-page-shell {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: calc(100dvh - var(--mud-appbar-height, 64px) - 32px);
+    padding: 1.5rem 0 2rem;
+}
+
+.login-page-card {
+    width: 100%;
+    max-width: 24rem;
+}
+
+.login-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.login-form-label {
+    font-size: var(--mud-typography-body2-size);
+    font-weight: var(--mud-typography-body2-weight);
+    line-height: var(--mud-typography-body2-lineheight);
+    color: var(--mud-palette-text-primary);
+}
+
+.login-form-input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 12px;
+    font: inherit;
+    color: var(--mud-palette-text-primary);
+    background-color: var(--mud-palette-surface);
+    border: 1px solid var(--mud-palette-lines-inputs);
+    border-radius: var(--mud-default-borderradius, 4px);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.login-form-input:focus {
+    outline: none;
+    border-color: var(--mud-palette-primary);
+    box-shadow: 0 0 0 1px var(--mud-palette-primary);
+}
+
 .participant-header {
     display: flex;
     align-items: center;

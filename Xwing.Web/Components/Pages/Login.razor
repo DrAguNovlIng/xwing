@@ -7,26 +7,45 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 <PageTitle>Login</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Login</MudText>
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
-}
-<form method="post" action="/account/login">
-    <AntiforgeryFormField />
-    <input type="hidden" name="returnUrl" value="@returnUrl" />
-    <MudStack Spacing="3" Style="max-width: 24rem;">
-        <div>
-            <MudText Typo="Typo.body2">Username</MudText>
-            <input type="text" name="userName" required class="mud-input-slot mud-input-root mud-input-outlined" style="width: 100%;" />
-        </div>
-        <div>
-            <MudText Typo="Typo.body2">Password</MudText>
-            <input type="password" name="password" required class="mud-input-slot mud-input-root mud-input-outlined" style="width: 100%;" />
-        </div>
-        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Sign in</MudButton>
-    </MudStack>
-</form>
+<div class="login-page-shell">
+    <MudPaper Class="login-page-card pa-6" Elevation="2" Outlined="true">
+        <MudText Typo="Typo.h5" Class="mb-4">Sign in</MudText>
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4" Dense="true">@errorMessage</MudAlert>
+        }
+        <form method="post" action="/account/login">
+            <AntiforgeryFormField />
+            <input type="hidden" name="returnUrl" value="@returnUrl" />
+            <MudStack Spacing="3">
+                <div class="login-form-field">
+                    <label class="login-form-label" for="login-userName">Username</label>
+                    <input id="login-userName"
+                           type="text"
+                           name="userName"
+                           required
+                           autocomplete="username"
+                           class="login-form-input" />
+                </div>
+                <div class="login-form-field">
+                    <label class="login-form-label" for="login-password">Password</label>
+                    <input id="login-password"
+                           type="password"
+                           name="password"
+                           required
+                           autocomplete="current-password"
+                           class="login-form-input" />
+                </div>
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true">
+                    Sign in
+                </MudButton>
+            </MudStack>
+        </form>
+    </MudPaper>
+</div>
 
 @code {
     private string? errorMessage;
