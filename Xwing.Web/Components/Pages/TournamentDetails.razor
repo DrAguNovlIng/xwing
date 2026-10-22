@@ -28,6 +28,7 @@ else if (tournament is null)
 }
 else
 {
+    <div class="tournament-details-page">
     <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Wrap="Wrap.Wrap">
         <MudButton Variant="Variant.Text"
                    StartIcon="@Icons.Material.Filled.ArrowBack"
@@ -39,17 +40,7 @@ else
     {
         <MudAlert Severity="@statusSeverity" Class="mb-4" Dense="true">@statusMessage</MudAlert>
     }
-    <MudText Typo="Typo.h4" Class="mb-2">@tournament.Name</MudText>
-    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="mb-4" Wrap="Wrap.Wrap">
-        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(tournament)">@GetStatusLabel(tournament)</MudChip>
-        <MudText Typo="Typo.body2">Start: @FormatDate(tournament.StartDateUtc)</MudText>
-        <MudText Typo="Typo.body2">End: @FormatDate(tournament.EndDateUtc)</MudText>
-        <MudButton Variant="Variant.Outlined" Size="Size.Small" Href="@($"/tournaments/{TournamentId}/results")">Results</MudButton>
-        @if (isAdmin)
-        {
-            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" Href="@($"/tournaments/{TournamentId}/edit")">Edit results</MudButton>
-        }
-    </MudStack>
+    <MudText Typo="Typo.h4" Class="mb-2 tournament-details-title">@tournament.Name</MudText>
     @if (!string.IsNullOrEmpty(joinTimeLeftLabel))
     {
         <MudText Typo="Typo.body2"
@@ -58,11 +49,27 @@ else
             @joinTimeLeftLabel
         </MudText>
     }
+    <div class="tournament-details-summary mb-4">
+        <div class="tournament-details-facts">
+            <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(tournament)">@GetStatusLabel(tournament)</MudChip>
+            <div class="tournament-details-dates">
+                <MudText Typo="Typo.body2">Start: @FormatDate(tournament.StartDateUtc)</MudText>
+                <MudText Typo="Typo.body2">End: @FormatDate(tournament.EndDateUtc)</MudText>
+            </div>
+        </div>
+        <div class="tournament-details-actions">
+            <MudButton Variant="Variant.Outlined" Size="Size.Small" Href="@($"/tournaments/{TournamentId}/results")">Results</MudButton>
+            @if (isAdmin)
+            {
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" Href="@($"/tournaments/{TournamentId}/edit")">Edit results</MudButton>
+            }
+        </div>
+    </div>
     @if (rosterOpen)
     {
-        @if (currentUserJoined)
-        {
-            <MudStack Row="true" Spacing="2" Class="mb-4" Wrap="Wrap.Wrap">
+        <div class="tournament-details-roster-actions mb-4">
+            @if (currentUserJoined)
+            {
                 <MudButton Variant="Variant.Outlined"
                            Color="Color.Primary"
                            Disabled="actionInProgress"
@@ -75,18 +82,17 @@ else
                            OnClick="ConfirmLeaveAsync">
                     Leave tournament
                 </MudButton>
-            </MudStack>
-        }
-        else
-        {
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       Class="mb-4"
-                       Disabled="actionInProgress"
-                       OnClick="JoinAsync">
-                Join tournament
-            </MudButton>
-        }
+            }
+            else
+            {
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Disabled="actionInProgress"
+                           OnClick="JoinAsync">
+                    Join tournament
+                </MudButton>
+            }
+        </div>
     }
     else
     {
@@ -140,6 +146,7 @@ else
             }
         </MudStack>
     }
+    </div>
 }
 
 @code {

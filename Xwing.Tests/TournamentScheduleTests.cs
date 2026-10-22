@@ -15,7 +15,7 @@ public sealed class TournamentScheduleTests
         };
         DateTimeOffset now = new(2026, 11, 1, 0, 0, 0, TimeSpan.Zero);
         string? text = TournamentSchedule.FormatTimeLeftToJoin(tournament, now);
-        text.ShouldBe("2 days left to join");
+        text.ShouldBe("Registration and squad changes closes in 2 days");
     }
 
     [Fact]
@@ -28,7 +28,7 @@ public sealed class TournamentScheduleTests
         };
         DateTimeOffset now = tournament.StartDateUtc - TimeSpan.FromDays(2) + TimeSpan.FromSeconds(1);
         string? text = TournamentSchedule.FormatTimeLeftToJoin(tournament, now);
-        text.ShouldBe("47 hours 59 minutes left to join");
+        text.ShouldBe("Registration and squad changes closes in 47 hours 59 minutes");
     }
 
     [Fact]

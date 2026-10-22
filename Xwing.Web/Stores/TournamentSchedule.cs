@@ -4,6 +4,8 @@ using Xwing.Web.Data;
 namespace Xwing.Web.Stores;
 public static class TournamentSchedule
 {
+    private const string RegistrationClosesPrefix = "Registration and squad changes closes in ";
+
     public static DateTimeOffset TodayUtc(TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(timeProvider);
@@ -36,12 +38,12 @@ public static class TournamentSchedule
         {
             int days = (int)Math.Floor(remaining.TotalDays);
             return days == 1
-                ? "1 day left to join"
-                : $"{days.ToString(CultureInfo.InvariantCulture)} days left to join";
+                ? $"{RegistrationClosesPrefix}1 day"
+                : $"{RegistrationClosesPrefix}{days.ToString(CultureInfo.InvariantCulture)} days";
         }
         if (remaining < TimeSpan.FromMinutes(1))
         {
-            return "Less than 1 minute left to join";
+            return $"{RegistrationClosesPrefix}less than 1 minute";
         }
         int totalMinutes = (int)Math.Floor(remaining.TotalMinutes);
         int hours = totalMinutes / 60;
@@ -70,7 +72,7 @@ public static class TournamentSchedule
         {
             combined = $"{hourPart} {minutePart}";
         }
-        return $"{combined} left to join";
+        return $"{RegistrationClosesPrefix}{combined}";
     }
 
     public static bool TimeLeftToJoinUsesMinuteRefresh(Tournament tournament, DateTimeOffset utcNow)
