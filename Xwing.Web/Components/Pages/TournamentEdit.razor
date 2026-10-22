@@ -1,4 +1,4 @@
-﻿@page "/tournaments/{TournamentId:int}/edit"
+@page "/tournaments/{TournamentId:int}/edit"
 
 @attribute [Authorize(Roles = UserRoles.Admin)]
 
@@ -32,7 +32,7 @@
     <MudText Typo="Typo.h5">@pageTitle</MudText>
     @if (graph is not null)
     {
-        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Class="mb-2">
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.End" Wrap="Wrap.Wrap" Class="mb-2">
             <MudSelect T="int?"
                        Label="Apply template"
                        Variant="Variant.Outlined"
@@ -45,6 +45,25 @@
                     <MudSelectItem T="int?" Value="@template.TournamentTemplateId">@template.Name</MudSelectItem>
                 }
             </MudSelect>
+            <MudNumericField T="int"
+                             @bind-Value="editGraphWidthCells"
+                             Label="Canvas width (cells)"
+                             Variant="Variant.Outlined"
+                             Min="@BracketGraphLayout.MinGraphCells"
+                             Max="@BracketGraphLayout.MaxGraphCells"
+                             Style="max-width: 10rem;" />
+            <MudNumericField T="int"
+                             @bind-Value="editGraphHeightCells"
+                             Label="Canvas height (cells)"
+                             Variant="Variant.Outlined"
+                             Min="@BracketGraphLayout.MinGraphCells"
+                             Max="@BracketGraphLayout.MaxGraphCells"
+                             Style="max-width: 10rem;" />
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       OnClick="SaveGraphSizeAsync">
+                Save canvas
+            </MudButton>
         </MudStack>
     }
     @if (!string.IsNullOrEmpty(statusMessage))
@@ -337,6 +356,7 @@
 <style>
     .template-graph-surface {
         position: relative;
+        box-sizing: content-box;
         border: 1px solid var(--mud-palette-lines-default);
         border-radius: 4px;
         background-color: var(--mud-palette-background-gray);
@@ -344,7 +364,8 @@
             linear-gradient(to right, color-mix(in srgb, var(--mud-palette-lines-default) 35%, transparent) 1px, transparent 1px),
             linear-gradient(to bottom, color-mix(in srgb, var(--mud-palette-lines-default) 35%, transparent) 1px, transparent 1px);
         background-size: 40px 40px;
-        overflow: auto;
+        overflow: clip;
+        align-self: flex-start;
     }
 
     .template-graph-surface-dragging .template-match-box:not(.template-match-box-ghost) {
@@ -411,8 +432,11 @@
     private const int BoxOffset = 6;
     private const int BoxWidth = 168;
     private const int BoxHeight = 88;
-    private const int MinSurfaceCells = 30;
     private const string OpenSlotValue = "open";
+
+    private int editGraphWidthCells;
+
+    private int editGraphHeightCells;
 
     [Parameter]
     public int TournamentId { get; set; }
@@ -495,6 +519,8 @@
         graph = result.Value!;
         pageTitle = graph.Tournament.Name;
         selectedTemplateId = graph.Tournament.TournamentTemplateId;
+        editGraphWidthCells = graph.Tournament.GraphWidthCells;
+        editGraphHeightCells = graph.Tournament.GraphHeightCells;
         if (selectedMatch is not null)
         {
             selectedMatch = graph.Matches.FirstOrDefault(m => m.TournamentMatchId == selectedMatch.TournamentMatchId);
@@ -502,43 +528,21 @@
         }
     }
 
-    private int surfaceWidth => ComputeSurfaceWidth();
+    private int surfaceWidth => graph is null
+        ? BracketGraphLayout.ToSurfacePixels(BracketGraphLayout.DefaultGraphWidthCells)
+        : BracketGraphLayout.ToSurfacePixels(graph.Tournament.GraphWidthCells);
 
-    private int surfaceHeight => ComputeSurfaceHeight();
+    private int surfaceHeight => graph is null
+        ? BracketGraphLayout.ToSurfacePixels(BracketGraphLayout.DefaultGraphHeightCells)
+        : BracketGraphLayout.ToSurfacePixels(graph.Tournament.GraphHeightCells);
 
-    private string SurfaceStyle => $"width: {surfaceWidth}px; height: {surfaceHeight}px; min-width: 100%;";
-
-    private int ComputeSurfaceWidth()
-    {
-        if (graph is null || graph.Matches.Count == 0)
-        {
-            return CellSize * MinSurfaceCells;
-        }
-        int maxRight = graph.Matches.Max(m => GetBoxRight(m));
-        return Math.Max(CellSize * MinSurfaceCells, maxRight + CellSize * 2);
-    }
-
-    private int ComputeSurfaceHeight()
-    {
-        if (graph is null || graph.Matches.Count == 0)
-        {
-            return CellSize * MinSurfaceCells;
-        }
-        int maxBottom = graph.Matches.Max(m => GetBoxBottom(m));
-        return Math.Max(CellSize * MinSurfaceCells, maxBottom + CellSize * 2);
-    }
+    private string SurfaceStyle => $"width: {surfaceWidth}px; height: {surfaceHeight}px; max-width: {surfaceWidth}px;";
 
     private int GetCellX(TournamentMatch match) =>
         draggingMatchId == match.TournamentMatchId ? dragCellX : match.PositionX;
 
     private int GetCellY(TournamentMatch match) =>
         draggingMatchId == match.TournamentMatchId ? dragCellY : match.PositionY;
-
-    private int GetBoxRight(TournamentMatch match) =>
-        GetCellX(match) * CellSize + BoxOffset + BoxWidth;
-
-    private int GetBoxBottom(TournamentMatch match) =>
-        GetCellY(match) * CellSize + BoxOffset + BoxHeight;
 
     private static string GetBoxStyle(int cellX, int cellY) =>
         $"left: {cellX * CellSize + BoxOffset}px; top: {cellY * CellSize + BoxOffset}px;";
@@ -710,6 +714,29 @@
         selectedMatch = null;
         ShowStatus("Template applied.", Severity.Success);
         await LoadGraphAsync();
+    }
+
+    private async Task SaveGraphSizeAsync()
+    {
+        if (graph is null)
+        {
+            return;
+        }
+
+        Result<Tournament> result = await BracketStore.UpdateGraphSizeAsync(
+            TournamentId,
+            editGraphWidthCells,
+            editGraphHeightCells,
+            graph.Tournament.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Could not save canvas size.", Severity.Error);
+            return;
+        }
+
+        await LoadGraphAsync();
+        ShowStatus("Canvas size saved.", Severity.Success);
     }
 
     private async Task OnEditRoundChangedAsync(int? value)
@@ -1168,8 +1195,10 @@
         {
             return;
         }
-        int nextX = Math.Max(0, (int)Math.Floor(e.OffsetX / CellSize));
-        int nextY = Math.Max(0, (int)Math.Floor(e.OffsetY / CellSize));
+        int maxX = graph is null ? int.MaxValue : BracketGraphLayout.MaxMatchPositionX(graph.Tournament.GraphWidthCells);
+        int maxY = graph is null ? int.MaxValue : BracketGraphLayout.MaxMatchPositionY(graph.Tournament.GraphHeightCells);
+        int nextX = Math.Clamp((int)Math.Floor(e.OffsetX / CellSize), 0, maxX);
+        int nextY = Math.Clamp((int)Math.Floor(e.OffsetY / CellSize), 0, maxY);
         if (nextX == dragCellX && nextY == dragCellY)
         {
             return;

@@ -34,7 +34,17 @@ public interface ITournamentTemplateStore
 
         CancellationToken cancellationToken);
 
+    Task<Result<TournamentTemplate>> UpdateGraphSizeAsync(
 
+        int tournamentTemplateId,
+
+        int graphWidthCells,
+
+        int graphHeightCells,
+
+        byte[] rowVersion,
+
+        CancellationToken cancellationToken);
 
     Task<Result> DeleteAsync(int tournamentTemplateId, byte[] rowVersion, CancellationToken cancellationToken);
 

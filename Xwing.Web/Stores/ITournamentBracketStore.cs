@@ -9,6 +9,18 @@ public interface ITournamentBracketStore
 
     Task<Result> AssignTemplateAsync(int tournamentId, int tournamentTemplateId, CancellationToken cancellationToken);
 
+    Task<Result<Tournament>> UpdateGraphSizeAsync(
+
+        int tournamentId,
+
+        int graphWidthCells,
+
+        int graphHeightCells,
+
+        byte[] rowVersion,
+
+        CancellationToken cancellationToken);
+
     Task<Result<TournamentMatch>> AddMatchAsync(int tournamentId, CancellationToken cancellationToken);
 
     Task<Result<TournamentMatch>> UpdateMatchNameAsync(

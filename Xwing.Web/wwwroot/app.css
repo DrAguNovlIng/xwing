@@ -145,6 +145,7 @@ h1:focus {
 
 .template-graph-surface {
     position: relative;
+    box-sizing: content-box;
     border: 1px solid var(--mud-palette-lines-default);
     border-radius: 4px;
     background-color: var(--mud-palette-background-gray);
@@ -152,7 +153,15 @@ h1:focus {
         linear-gradient(to right, color-mix(in srgb, var(--mud-palette-lines-default) 35%, transparent) 1px, transparent 1px),
         linear-gradient(to bottom, color-mix(in srgb, var(--mud-palette-lines-default) 35%, transparent) 1px, transparent 1px);
     background-size: 40px 40px;
-    overflow: auto;
+    overflow: clip;
+    align-self: flex-start;
+}
+
+/* Results places the canvas in a column flex stack. Keep that flex item the
+   width of the page so the wide canvas overflows it instead of widening it. */
+.results-canvas-frame {
+    width: 0;
+    min-width: 100%;
 }
 
 .template-graph-edges {

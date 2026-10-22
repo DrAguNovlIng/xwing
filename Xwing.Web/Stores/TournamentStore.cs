@@ -49,6 +49,8 @@ public sealed class TournamentStore : ITournamentStore
             Name = name.Trim(),
             StartDateUtc = NormalizeToUtcDate(startDateUtc),
             EndDateUtc = NormalizeToUtcDate(endDateUtc),
+            GraphWidthCells = BracketGraphLayout.DefaultGraphWidthCells,
+            GraphHeightCells = BracketGraphLayout.DefaultGraphHeightCells,
         };
         context.Tournaments.Add(tournament);
         Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
