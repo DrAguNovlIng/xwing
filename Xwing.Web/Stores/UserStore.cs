@@ -227,6 +227,41 @@ public sealed class UserStore : IUserStore
         return await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<Result> ChangePasswordAsync(
+        int userId,
+        string currentPassword,
+        string newPassword,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(currentPassword))
+        {
+            return Result.Fail("Current password is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(newPassword))
+        {
+            return Result.Fail("New password is required.");
+        }
+
+        await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        User? user = await context.Users
+            .SingleOrDefaultAsync(u => u.UserId == userId, cancellationToken)
+            .ConfigureAwait(false);
+        if (user is null)
+        {
+            return Result.Fail("User not found.");
+        }
+
+        PasswordVerificationResult verification = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, currentPassword);
+        if (verification is PasswordVerificationResult.Failed)
+        {
+            return Result.Fail("Current password is incorrect.");
+        }
+
+        user.PasswordHash = passwordHasher.HashPassword(user, newPassword);
+        return await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
+    }
+
     private static UserAccount ToAccount(User user) =>
         new()
         {

@@ -23,4 +23,10 @@ public interface IUserStore
     Task<Result> DeactivateAsync(int userId, CancellationToken cancellationToken);
 
     Task<Result> ActivateAsync(int userId, CancellationToken cancellationToken);
+
+    Task<Result> ChangePasswordAsync(
+        int userId,
+        string currentPassword,
+        string newPassword,
+        CancellationToken cancellationToken);
 }

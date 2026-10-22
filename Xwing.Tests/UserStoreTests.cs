@@ -191,6 +191,93 @@ public sealed class UserStoreTests
     }
 
     [Fact]
+    public async Task ChangePasswordAsyncShouldReplacePasswordWhenCurrentIsCorrect()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<UserAccount> created = await stores.Users.CreateAsync(
+                "member",
+                "old-password",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            created.IsSuccess.ShouldBeTrue();
+            int userId = created.Value!.UserId;
+            Result changed = await stores.Users.ChangePasswordAsync(
+                userId,
+                "old-password",
+                "new-password",
+                TestContext.Current.CancellationToken);
+            changed.IsSuccess.ShouldBeTrue();
+            Result<UserAccount> oldLogin = await stores.Users.VerifyLoginAsync(
+                "member",
+                "old-password",
+                TestContext.Current.CancellationToken);
+            oldLogin.IsSuccess.ShouldBeFalse();
+            Result<UserAccount> newLogin = await stores.Users.VerifyLoginAsync(
+                "member",
+                "new-password",
+                TestContext.Current.CancellationToken);
+            newLogin.IsSuccess.ShouldBeTrue();
+        }
+    }
+
+    [Fact]
+    public async Task ChangePasswordAsyncShouldRejectWrongCurrentPassword()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<UserAccount> created = await stores.Users.CreateAsync(
+                "member",
+                "keep-me",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            created.IsSuccess.ShouldBeTrue();
+            Result changed = await stores.Users.ChangePasswordAsync(
+                created.Value!.UserId,
+                "wrong",
+                "new-password",
+                TestContext.Current.CancellationToken);
+            changed.IsSuccess.ShouldBeFalse();
+            changed.Error.ShouldBe("Current password is incorrect.");
+            Result<UserAccount> login = await stores.Users.VerifyLoginAsync(
+                "member",
+                "keep-me",
+                TestContext.Current.CancellationToken);
+            login.IsSuccess.ShouldBeTrue();
+        }
+    }
+
+    [Fact]
+    public async Task ChangePasswordAsyncShouldRejectBlankNewPassword()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<UserAccount> created = await stores.Users.CreateAsync(
+                "member",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            created.IsSuccess.ShouldBeTrue();
+            Result changed = await stores.Users.ChangePasswordAsync(
+                created.Value!.UserId,
+                "secret",
+                "   ",
+                TestContext.Current.CancellationToken);
+            changed.IsSuccess.ShouldBeFalse();
+            changed.Error.ShouldBe("New password is required.");
+        }
+    }
+
+    [Fact]
     public async Task DeactivateAsyncShouldRejectLastAdmin()
     {
         TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
