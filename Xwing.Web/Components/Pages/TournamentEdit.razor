@@ -351,6 +351,14 @@
                     </MudPaper>
             }
         </div>
+        <MudTextField @bind-Value="editFormatDescription"
+                      Label="Format"
+                      Variant="Variant.Outlined"
+                      Lines="6"
+                      MaxLength="4000"
+                      Class="format-description-field mt-4"
+                      Immediate="true"
+                      OnBlur="OnFormatDescriptionBlurAsync" />
     }
 </MudStack>
 
@@ -436,6 +444,8 @@
     private const string OpenSlotValue = "open";
     private int editGraphWidthCells;
     private int editGraphHeightCells;
+    private string editFormatDescription = string.Empty;
+    private Task saveFormatDescriptionQueue = Task.CompletedTask;
     [Parameter]
     public int TournamentId { get; set; }
     private TournamentBracketGraph? graph;
@@ -489,6 +499,7 @@
         selectedTemplateId = graph.Tournament.TournamentTemplateId;
         editGraphWidthCells = graph.Tournament.GraphWidthCells;
         editGraphHeightCells = graph.Tournament.GraphHeightCells;
+        editFormatDescription = graph.Tournament.FormatDescription ?? string.Empty;
         if (selectedMatch is not null)
         {
             selectedMatch = graph.Matches.FirstOrDefault(m => m.TournamentMatchId == selectedMatch.TournamentMatchId);
@@ -732,6 +743,63 @@
             statusMessage = null;
         }
     }
+
+    private Task OnFormatDescriptionBlurAsync()
+    {
+        saveFormatDescriptionQueue = SaveNextFormatDescriptionAsync(saveFormatDescriptionQueue);
+        return saveFormatDescriptionQueue;
+    }
+
+    private async Task SaveNextFormatDescriptionAsync(Task previous)
+    {
+        try
+        {
+            await previous;
+        }
+        catch (Exception)
+        {
+            // The previous attempt already reported its own error.
+        }
+
+        if (graph is null)
+        {
+            return;
+        }
+
+        string? normalizedEdit = NormalizeFormatDescription(editFormatDescription);
+        string? stored = graph.Tournament.FormatDescription;
+        if (normalizedEdit == stored)
+        {
+            return;
+        }
+
+        string? previousStored = stored;
+        byte[] rowVersion = graph.Tournament.RowVersion;
+        graph.Tournament.FormatDescription = normalizedEdit;
+        Result<Tournament> result = await BracketStore.UpdateFormatDescriptionAsync(
+            TournamentId,
+            editFormatDescription,
+            rowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            graph.Tournament.FormatDescription = previousStored;
+            editFormatDescription = previousStored ?? string.Empty;
+            ShowStatus(result.Error ?? "Could not save format.", Severity.Error);
+            return;
+        }
+
+        graph.Tournament.RowVersion = result.Value!.RowVersion;
+        graph.Tournament.FormatDescription = result.Value.FormatDescription;
+        editFormatDescription = result.Value.FormatDescription ?? string.Empty;
+        if (statusSeverity == Severity.Error)
+        {
+            statusMessage = null;
+        }
+    }
+
+    private static string? NormalizeFormatDescription(string? text) =>
+        string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 
     private async Task OnEditRoundChangedAsync(int? value)
     {

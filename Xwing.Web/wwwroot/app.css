@@ -304,6 +304,17 @@ h1:focus {
     align-self: flex-start;
 }
 
+.format-description-field,
+.format-description-display {
+    width: 100%;
+    max-width: 100%;
+    align-self: stretch;
+}
+
+.format-description-display .mud-typography-body1 {
+    white-space: pre-wrap;
+}
+
 .bracket-inline-controls {
     row-gap: 8px;
 }

@@ -141,6 +141,38 @@ public sealed class TournamentTemplateStore : ITournamentTemplateStore
         return Result.Ok(template);
     }
 
+    public async Task<Result<TournamentTemplate>> UpdateFormatDescriptionAsync(
+        int tournamentTemplateId,
+        string? formatDescription,
+        byte[] rowVersion,
+        CancellationToken cancellationToken)
+    {
+        Result? validation = FormatDescriptionInput.Validate(formatDescription, out string? normalized);
+        if (validation is not null)
+        {
+            return Result.Fail<TournamentTemplate>(validation.Error!);
+        }
+
+        await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        TournamentTemplate? template = await context.TournamentTemplates
+            .SingleOrDefaultAsync(t => t.TournamentTemplateId == tournamentTemplateId, cancellationToken)
+            .ConfigureAwait(false);
+        if (template is null)
+        {
+            return Result.Fail<TournamentTemplate>("Template not found.");
+        }
+
+        template.FormatDescription = normalized;
+        context.Entry(template).Property(e => e.RowVersion).OriginalValue = rowVersion;
+        Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
+        if (!saveResult.IsSuccess)
+        {
+            return Result.Fail<TournamentTemplate>(saveResult.Error!);
+        }
+
+        return Result.Ok(template);
+    }
+
     public async Task<Result> DeleteAsync(int tournamentTemplateId, byte[] rowVersion, CancellationToken cancellationToken)
     {
         await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);

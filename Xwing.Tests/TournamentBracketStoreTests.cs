@@ -55,6 +55,76 @@ public sealed class TournamentBracketStoreTests
     }
 
     [Fact]
+    public async Task UpdateFormatDescriptionAsyncShouldSaveAndClear()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+                "Event",
+                DefaultStart,
+                DefaultEnd,
+                TestContext.Current.CancellationToken);
+            const string description = "Single elimination\nBest of 3";
+            Result<Tournament> saved = await stores.Brackets.UpdateFormatDescriptionAsync(
+                tournament.Value!.TournamentId,
+                description,
+                tournament.Value.RowVersion,
+                TestContext.Current.CancellationToken);
+            saved.IsSuccess.ShouldBeTrue();
+            saved.Value!.FormatDescription.ShouldBe(description);
+            Result<TournamentBracketGraph> graph = await stores.Brackets.GetGraphAsync(
+                tournament.Value.TournamentId,
+                TestContext.Current.CancellationToken);
+            graph.Value!.Tournament.FormatDescription.ShouldBe(description);
+            Result<Tournament> cleared = await stores.Brackets.UpdateFormatDescriptionAsync(
+                tournament.Value.TournamentId,
+                string.Empty,
+                saved.Value.RowVersion,
+                TestContext.Current.CancellationToken);
+            cleared.IsSuccess.ShouldBeTrue();
+            cleared.Value!.FormatDescription.ShouldBeNull();
+        }
+    }
+
+    [Fact]
+    public async Task AssignTemplateShouldCopyFormatDescription()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<TournamentTemplate> template = await stores.Templates.CreateAsync(
+                "Swiss",
+                TestContext.Current.CancellationToken);
+            const string description = "4 rounds Swiss, cut to top 8";
+            Result<TournamentTemplate> withFormat = await stores.Templates.UpdateFormatDescriptionAsync(
+                template.Value!.TournamentTemplateId,
+                description,
+                template.Value.RowVersion,
+                TestContext.Current.CancellationToken);
+            withFormat.IsSuccess.ShouldBeTrue();
+            Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+                "Event",
+                DefaultStart,
+                DefaultEnd,
+                TestContext.Current.CancellationToken);
+            Result assigned = await stores.Brackets.AssignTemplateAsync(
+                tournament.Value!.TournamentId,
+                template.Value.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            assigned.IsSuccess.ShouldBeTrue();
+            Result<TournamentBracketGraph> graph = await stores.Brackets.GetGraphAsync(
+                tournament.Value.TournamentId,
+                TestContext.Current.CancellationToken);
+            graph.Value!.Tournament.FormatDescription.ShouldBe(description);
+        }
+    }
+
+    [Fact]
     public async Task AssignTemplateShouldCopyGraphSize()
     {
         TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(

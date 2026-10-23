@@ -15,6 +15,13 @@ public interface ITournamentBracketStore
         int graphHeightCells,
         byte[] rowVersion,
         CancellationToken cancellationToken);
+
+    Task<Result<Tournament>> UpdateFormatDescriptionAsync(
+        int tournamentId,
+        string? formatDescription,
+        byte[] rowVersion,
+        CancellationToken cancellationToken);
+
     Task<Result<TournamentMatch>> AddMatchAsync(int tournamentId, CancellationToken cancellationToken);
 
     Task<Result<TournamentMatch>> UpdateMatchNameAsync(

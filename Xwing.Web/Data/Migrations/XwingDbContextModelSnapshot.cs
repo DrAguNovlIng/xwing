@@ -127,6 +127,10 @@ namespace Xwing.Web.Data.Migrations
                     b.Property<DateTimeOffset>("EndDateUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("FormatDescription")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
                     b.Property<int>("GraphHeightCells")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
@@ -345,6 +349,10 @@ namespace Xwing.Web.Data.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TournamentTemplateId"));
+
+                    b.Property<string>("FormatDescription")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
 
                     b.Property<int>("GraphHeightCells")
                         .ValueGeneratedOnAdd()

@@ -127,6 +127,7 @@ public sealed class TournamentBracketStore : ITournamentBracketStore
         tournament.TournamentTemplateId = tournamentTemplateId;
         tournament.GraphWidthCells = template.GraphWidthCells;
         tournament.GraphHeightCells = template.GraphHeightCells;
+        tournament.FormatDescription = template.FormatDescription;
         return await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
     }
 
@@ -154,6 +155,38 @@ public sealed class TournamentBracketStore : ITournamentBracketStore
 
         tournament.GraphWidthCells = graphWidthCells;
         tournament.GraphHeightCells = graphHeightCells;
+        context.Entry(tournament).Property(e => e.RowVersion).OriginalValue = rowVersion;
+        Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
+        if (!saveResult.IsSuccess)
+        {
+            return Result.Fail<Tournament>(saveResult.Error!);
+        }
+
+        return Result.Ok(tournament);
+    }
+
+    public async Task<Result<Tournament>> UpdateFormatDescriptionAsync(
+        int tournamentId,
+        string? formatDescription,
+        byte[] rowVersion,
+        CancellationToken cancellationToken)
+    {
+        Result? validation = FormatDescriptionInput.Validate(formatDescription, out string? normalized);
+        if (validation is not null)
+        {
+            return Result.Fail<Tournament>(validation.Error!);
+        }
+
+        await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        Tournament? tournament = await context.Tournaments
+            .SingleOrDefaultAsync(t => t.TournamentId == tournamentId, cancellationToken)
+            .ConfigureAwait(false);
+        if (tournament is null)
+        {
+            return Result.Fail<Tournament>("Tournament not found.");
+        }
+
+        tournament.FormatDescription = normalized;
         context.Entry(tournament).Property(e => e.RowVersion).OriginalValue = rowVersion;
         Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
         if (!saveResult.IsSuccess)

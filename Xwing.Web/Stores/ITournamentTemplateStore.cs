@@ -24,6 +24,12 @@ public interface ITournamentTemplateStore
         byte[] rowVersion,
         CancellationToken cancellationToken);
 
+    Task<Result<TournamentTemplate>> UpdateFormatDescriptionAsync(
+        int tournamentTemplateId,
+        string? formatDescription,
+        byte[] rowVersion,
+        CancellationToken cancellationToken);
+
     Task<Result> DeleteAsync(int tournamentTemplateId, byte[] rowVersion, CancellationToken cancellationToken);
 
     Task<Result<TemplateMatch>> AddMatchAsync(int tournamentTemplateId, CancellationToken cancellationToken);

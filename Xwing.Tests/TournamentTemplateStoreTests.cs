@@ -285,6 +285,46 @@ public sealed class TournamentTemplateStoreTests
         }
     }
 
+    [Fact]
+    public async Task UpdateFormatDescriptionAsyncShouldSaveAndClear()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<TournamentTemplate> template = await stores.Templates.CreateAsync(
+                "Format",
+                TestContext.Current.CancellationToken);
+            const string description = "Swiss\n5 rounds";
+            Result<TournamentTemplate> saved = await stores.Templates.UpdateFormatDescriptionAsync(
+                template.Value!.TournamentTemplateId,
+                description,
+                template.Value.RowVersion,
+                TestContext.Current.CancellationToken);
+            saved.IsSuccess.ShouldBeTrue();
+            saved.Value!.FormatDescription.ShouldBe(description);
+            Result<TournamentTemplateGraph> graph = await stores.Templates.GetGraphAsync(
+                template.Value.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            graph.Value!.Template.FormatDescription.ShouldBe(description);
+            Result<TournamentTemplate> cleared = await stores.Templates.UpdateFormatDescriptionAsync(
+                template.Value.TournamentTemplateId,
+                "   ",
+                saved.Value.RowVersion,
+                TestContext.Current.CancellationToken);
+            cleared.IsSuccess.ShouldBeTrue();
+            cleared.Value!.FormatDescription.ShouldBeNull();
+            string tooLong = new('x', 4001);
+            Result<TournamentTemplate> rejected = await stores.Templates.UpdateFormatDescriptionAsync(
+                template.Value.TournamentTemplateId,
+                tooLong,
+                cleared.Value.RowVersion,
+                TestContext.Current.CancellationToken);
+            rejected.IsSuccess.ShouldBeFalse();
+        }
+    }
+
     private static async Task<int> CreateTemplateWithThreeMatchesAsync(TestStores stores)
     {
         Result<TournamentTemplate> template = await stores.Templates.CreateAsync(

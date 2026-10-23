@@ -114,6 +114,13 @@
         </div>
         </div>
         }
+        @if (!string.IsNullOrEmpty(graph.Tournament.FormatDescription))
+        {
+            <div class="format-description-display mt-4">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Format</MudText>
+                <MudText Typo="Typo.body1">@graph.Tournament.FormatDescription</MudText>
+            </div>
+        }
     }
 </MudStack>
 

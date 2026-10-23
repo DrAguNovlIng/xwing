@@ -9,4 +9,5 @@ public sealed class Tournament : BaseModel
     public TournamentTemplate? TournamentTemplate { get; set; }
     public int GraphWidthCells { get; set; } = 30;
     public int GraphHeightCells { get; set; } = 30;
+    public string? FormatDescription { get; set; }
 }
