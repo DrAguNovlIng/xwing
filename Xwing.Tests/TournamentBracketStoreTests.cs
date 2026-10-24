@@ -128,10 +128,15 @@ public sealed class TournamentBracketStoreTests
             Result<TournamentBracketGraph> graph = await stores.Brackets.GetGraphAsync(
                 tournament.Value.TournamentId,
                 TestContext.Current.CancellationToken);
+            int lastColumnWidth = graph.Value!.CanvasRounds[^1].WidthCells;
+            int tooNarrowWidth = graph.Value.Tournament.GraphWidthCells
+                - lastColumnWidth
+                + BracketRoundLayout.MinColumnWidthCells
+                - 1;
             Result<Tournament> shrunk = await stores.Brackets.UpdateGraphSizeAsync(
                 tournament.Value.TournamentId,
-                24,
-                graph.Value!.Tournament.GraphHeightCells,
+                tooNarrowWidth,
+                graph.Value.Tournament.GraphHeightCells,
                 graph.Value.Tournament.RowVersion,
                 TestContext.Current.CancellationToken);
             shrunk.IsSuccess.ShouldBeFalse();
