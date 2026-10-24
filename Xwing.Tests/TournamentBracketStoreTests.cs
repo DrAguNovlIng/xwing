@@ -506,6 +506,95 @@ public sealed class TournamentBracketStoreTests
         }
     }
 
+    [Fact]
+    public async Task UpdateMatchResultShouldPropagateWinnerAndLoserFeeds()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<UserAccount> playerA = await stores.Users.CreateAsync(
+                "player-a",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            Result<UserAccount> playerB = await stores.Users.CreateAsync(
+                "player-b",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            Result<TournamentTemplate> template = await stores.Templates.CreateAsync(
+                "Bracket",
+                TestContext.Current.CancellationToken);
+            Result<TemplateMatch> templateMatch1 = await stores.Templates.AddMatchAsync(
+                template.Value!.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            Result<TemplateMatch> templateMatch2 = await stores.Templates.AddMatchAsync(
+                template.Value.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            await stores.Templates.SetSlotFeedAsync(
+                templateMatch2.Value!.TemplateMatchId,
+                TemplateMatchSlot.A,
+                templateMatch1.Value!.TemplateMatchId,
+                TemplateFeedOutcome.Winner,
+                templateMatch2.Value.RowVersion,
+                TestContext.Current.CancellationToken);
+            await stores.Templates.SetSlotFeedAsync(
+                templateMatch2.Value.TemplateMatchId,
+                TemplateMatchSlot.B,
+                templateMatch1.Value.TemplateMatchId,
+                TemplateFeedOutcome.Loser,
+                templateMatch2.Value.RowVersion,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+                "Event",
+                DefaultStart,
+                DefaultEnd,
+                TestContext.Current.CancellationToken);
+            await stores.Tournaments.JoinAsync(
+                tournament.Value!.TournamentId,
+                playerA.Value!.UserId,
+                TestContext.Current.CancellationToken);
+            await stores.Tournaments.JoinAsync(
+                tournament.Value.TournamentId,
+                playerB.Value!.UserId,
+                TestContext.Current.CancellationToken);
+            await stores.Brackets.AssignTemplateAsync(
+                tournament.Value.TournamentId,
+                template.Value.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            Result<TournamentBracketGraph> graph = await stores.Brackets.GetGraphAsync(
+                tournament.Value.TournamentId,
+                TestContext.Current.CancellationToken);
+            TournamentMatch[] matches = graph.Value!.Matches.OrderBy(m => m.TournamentMatchId).ToArray();
+            TournamentMatch semifinal = matches[0];
+            TournamentMatch finalMatch = matches[1];
+            var semifinalResult = new TournamentMatchResultUpdate(
+                TournamentMatchStatus.Finished,
+                TournamentMatchPlayMode.Online,
+                null,
+                playerA.Value.UserId,
+                playerB.Value.UserId,
+                20,
+                10,
+                TournamentMatchWinner.SlotA);
+            Result<TournamentMatch> saved = await stores.Brackets.UpdateMatchResultAsync(
+                tournament.Value.TournamentId,
+                semifinal.TournamentMatchId,
+                semifinalResult,
+                semifinal.RowVersion,
+                TestContext.Current.CancellationToken);
+            saved.IsSuccess.ShouldBeTrue();
+            Result<TournamentBracketGraph> after = await stores.Brackets.GetGraphAsync(
+                tournament.Value.TournamentId,
+                TestContext.Current.CancellationToken);
+            TournamentMatch updatedFinal = after.Value!.Matches.Single(m => m.TournamentMatchId == finalMatch.TournamentMatchId);
+            updatedFinal.SlotAUserId.ShouldBe(playerA.Value.UserId);
+            updatedFinal.SlotBUserId.ShouldBe(playerB.Value.UserId);
+        }
+    }
+
     private static async Task<(Tournament Tournament, TournamentMatch Match)> CreateTournamentWithSingleMatchAsync(
         TestStores stores)
     {

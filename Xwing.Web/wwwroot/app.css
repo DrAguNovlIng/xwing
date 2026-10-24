@@ -468,20 +468,33 @@ h1:focus {
     flex-shrink: 0;
 }
 
-.template-match-box-replay-code {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-    margin-bottom: 2px;
-}
-
 .template-match-box-replay-code-value {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-family: var(--mud-typography-monospace-family, ui-monospace, monospace);
     font-size: 0.7rem;
     line-height: 1.2;
     user-select: all;
-    word-break: break-all;
+    white-space: nowrap;
+}
+
+.template-match-box-replay-field {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.template-match-box-replay-field .mud-input-control-input-container {
+    margin-top: 0;
+}
+
+.template-match-box-replay-field input {
+    font-family: var(--mud-typography-monospace-family, ui-monospace, monospace);
+    font-size: 0.7rem;
+    padding: 0;
 }
 
 .slot-line {

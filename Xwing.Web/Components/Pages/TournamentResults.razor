@@ -101,36 +101,32 @@
                         string? replayWatchUrl = FourGgReplay.ToWatchUrl(match.ReplayUrl);
                         string? replayDisplayCode = FourGgReplay.GetCodeForDisplay(match.ReplayUrl);
                     }
-                    @if (replayWatchUrl is not null)
+                    @if (ShowReplayMetaRow(match, replayWatchUrl, replayDisplayCode))
                     {
-                        <div class="template-match-box-meta">
-                            <MudLink Href="@replayWatchUrl"
-                                     Target="_blank"
-                                     Typo="Typo.caption"
-                                     Class="template-match-box-meta-link">Replay</MudLink>
-                        </div>
-                    }
-                    @if (match.Status == TournamentMatchStatus.InProgress
-                         && !string.IsNullOrEmpty(replayDisplayCode)
-                         && !CanEditReplayCode(match))
-                    {
-                        <div class="template-match-box-replay-code">
-                            <MudText Typo="Typo.caption">Match code</MudText>
-                            <span class="template-match-box-replay-code-value" title="Select to copy">@replayDisplayCode</span>
-                        </div>
-                    }
-                    @if (CanEditReplayCode(match))
-                    {
-                        <div class="template-match-box-replay-edit" @onfocusin:stopPropagation="true">
-                            <MudTextField T="string"
-                                          Value="@GetReplayCodeEditValue(match)"
-                                          ValueChanged="@(value => SetReplayCodeEditValue(match.TournamentMatchId, value))"
-                                          Label="Replay code"
-                                          Margin="Margin.Dense"
-                                          Variant="Variant.Text"
-                                          Class="template-match-box-replay-field"
-                                          Immediate="true"
-                                          OnBlur="@(_ => SaveReplayCodeAsync(match))" />
+                        <div class="template-match-box-meta" @onfocusin:stopPropagation="true">
+                            @if (CanEditReplayCode(match))
+                            {
+                                <MudTextField T="string"
+                                              Value="@GetReplayCodeEditValue(match)"
+                                              ValueChanged="@(value => SetReplayCodeEditValue(match.TournamentMatchId, value))"
+                                              Margin="Margin.None"
+                                              Variant="Variant.Text"
+                                              Class="template-match-box-replay-field"
+                                              Immediate="true"
+                                              OnBlur="@(_ => SaveReplayCodeAsync(match))" />
+                            }
+                            else if (match.Status == TournamentMatchStatus.InProgress
+                                     && !string.IsNullOrEmpty(replayDisplayCode))
+                            {
+                                <span class="template-match-box-replay-code-value" title="Select to copy">@replayDisplayCode</span>
+                            }
+                            @if (replayWatchUrl is not null)
+                            {
+                                <MudLink Href="@replayWatchUrl"
+                                         Target="_blank"
+                                         Typo="Typo.caption"
+                                         Class="template-match-box-meta-link">Replay</MudLink>
+                            }
                         </div>
                     }
                     <MudText Typo="Typo.caption" Class="@GetSlotLineClass(match, TemplateMatchSlot.A)">A: @FormatSlot(match, TemplateMatchSlot.A)</MudText>
@@ -296,6 +292,18 @@
 
         return null;
     }
+
+    private static bool ShowReplayMetaRow(
+        TournamentMatch match,
+        string? replayWatchUrl,
+        string? replayDisplayCode,
+        bool canEditReplayCode) =>
+        replayWatchUrl is not null
+        || canEditReplayCode
+        || (match.Status == TournamentMatchStatus.InProgress && !string.IsNullOrEmpty(replayDisplayCode));
+
+    private bool ShowReplayMetaRow(TournamentMatch match, string? replayWatchUrl, string? replayDisplayCode) =>
+        ShowReplayMetaRow(match, replayWatchUrl, replayDisplayCode, CanEditReplayCode(match));
 
     private bool CanEditReplayCode(TournamentMatch match)
     {

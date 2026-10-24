@@ -594,6 +594,8 @@ public sealed class TournamentBracketStore : ITournamentBracketStore
             return Result.Fail<TournamentMatch>("Match not found.");
         }
 
+        TournamentMatchWinner previousWinner = match.Winner;
+
         Result? participantValidation = await ValidateParticipantsAsync(
             context,
             tournamentId,
@@ -619,6 +621,23 @@ public sealed class TournamentBracketStore : ITournamentBracketStore
         match.SlotAPoints = update.SlotAPoints;
         match.SlotBPoints = update.SlotBPoints;
         match.Winner = update.Winner;
+
+        bool shouldPropagateFeeds = update.Winner != TournamentMatchWinner.None
+            || previousWinner != TournamentMatchWinner.None;
+        if (shouldPropagateFeeds)
+        {
+            List<TournamentMatchFeed> outgoingFeeds = await context.TournamentMatchFeeds
+                .Include(f => f.TargetMatch)
+                .Where(f => f.SourceTournamentMatchId == tournamentMatchId)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+            Result? propagation = TournamentMatchFeedPropagation.ApplyOutgoingFeeds(match, outgoingFeeds);
+            if (propagation is not null)
+            {
+                return Result.Fail<TournamentMatch>(propagation.Error!);
+            }
+        }
+
         context.Entry(match).Property(e => e.RowVersion).OriginalValue = rowVersion;
         Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
         if (!saveResult.IsSuccess)
