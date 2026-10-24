@@ -36,6 +36,33 @@ public sealed class TournamentStandingsTests
     }
 
     [Fact]
+    public void CalculateInProgressShouldNotCountAsPlayed()
+    {
+        var matches = new[]
+        {
+            Match(
+                round: 1,
+                slotA: 1,
+                slotB: 2,
+                winner: TournamentMatchWinner.None,
+                pointsA: 12,
+                pointsB: 8,
+                status: TournamentMatchStatus.InProgress),
+        };
+        var filter = new TournamentStandingsFilter(null, null, IncludeMatchesWithoutRound: true);
+
+        IReadOnlyList<TournamentStandingsRow> rows = TournamentStandings.Calculate(
+            [PlayerA, PlayerB],
+            matches,
+            filter);
+
+        rows.Single(r => r.UserId == 1).MatchesPlayed.ShouldBe(0);
+        rows.Single(r => r.UserId == 1).Points.ShouldBe(0);
+        rows.Single(r => r.UserId == 2).MatchesPlayed.ShouldBe(0);
+        rows.Single(r => r.UserId == 2).Points.ShouldBe(0);
+    }
+
+    [Fact]
     public void CalculateNeitherWinnerShouldCountPlayedAndPointsWithoutWinOrLoss()
     {
         var matches = new[]
@@ -122,12 +149,14 @@ public sealed class TournamentStandingsTests
         int slotB,
         TournamentMatchWinner winner,
         int? pointsA,
-        int? pointsB) =>
+        int? pointsB,
+        TournamentMatchStatus status = TournamentMatchStatus.Finished) =>
         new()
         {
             RoundNumber = round,
             SlotAUserId = slotA,
             SlotBUserId = slotB,
+            Status = status,
             Winner = winner,
             SlotAPoints = pointsA,
             SlotBPoints = pointsB,

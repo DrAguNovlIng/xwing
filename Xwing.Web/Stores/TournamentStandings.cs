@@ -48,6 +48,11 @@ public static class TournamentStandings
                     continue;
                 }
 
+                if (match.Status != TournamentMatchStatus.Finished)
+                {
+                    continue;
+                }
+
                 played++;
                 points += inSlotA ? match.SlotAPoints ?? 0 : match.SlotBPoints ?? 0;
 
