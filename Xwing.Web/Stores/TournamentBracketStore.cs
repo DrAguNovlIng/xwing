@@ -62,7 +62,13 @@ public sealed class TournamentBracketStore : ITournamentBracketStore
             .Select(x => new TournamentBracketParticipant(x.UserId, x.UserName, x.IsActive))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
-        return Result.Ok(new TournamentBracketGraph(tournament, matches, feeds, participants));
+        List<TournamentCanvasRound> canvasRounds = await context.TournamentCanvasRounds
+            .AsNoTracking()
+            .Where(r => r.TournamentId == tournamentId)
+            .OrderBy(r => r.SortOrder)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return Result.Ok(new TournamentBracketGraph(tournament, matches, feeds, participants, canvasRounds));
     }
 
     public async Task<Result> AssignTemplateAsync(int tournamentId, int tournamentTemplateId, CancellationToken cancellationToken)
@@ -123,6 +129,22 @@ public sealed class TournamentBracketStore : ITournamentBracketStore
             });
         }
 
+        List<TournamentCanvasRound> existingRounds = await context.TournamentCanvasRounds
+            .Where(r => r.TournamentId == tournamentId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        context.TournamentCanvasRounds.RemoveRange(existingRounds);
+        foreach (TemplateCanvasRound templateRound in templateGraph.Value!.CanvasRounds)
+        {
+            context.TournamentCanvasRounds.Add(new TournamentCanvasRound
+            {
+                TournamentId = tournamentId,
+                SortOrder = templateRound.SortOrder,
+                WidthCells = templateRound.WidthCells,
+                Scenario = templateRound.Scenario,
+            });
+        }
+
         TournamentTemplate template = templateGraph.Value!.Template;
         tournament.TournamentTemplateId = tournamentTemplateId;
         tournament.GraphWidthCells = template.GraphWidthCells;
@@ -153,9 +175,94 @@ public sealed class TournamentBracketStore : ITournamentBracketStore
             return Result.Fail<Tournament>("Tournament not found.");
         }
 
+        List<TournamentCanvasRound> canvasRounds = await context.TournamentCanvasRounds
+            .Where(r => r.TournamentId == tournamentId)
+            .OrderBy(r => r.SortOrder)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (canvasRounds.Count > 0)
+        {
+            int[] currentWidths = canvasRounds.Select(r => r.WidthCells).ToArray();
+            Result<List<int>> adjusted = BracketRoundLayout.TryAdjustForCanvasWidthChange(
+                currentWidths,
+                graphWidthCells);
+            if (!adjusted.IsSuccess)
+            {
+                return Result.Fail<Tournament>(adjusted.Error!);
+            }
+
+            for (int i = 0; i < canvasRounds.Count; i++)
+            {
+                canvasRounds[i].WidthCells = adjusted.Value![i];
+            }
+        }
+
         tournament.GraphWidthCells = graphWidthCells;
         tournament.GraphHeightCells = graphHeightCells;
         context.Entry(tournament).Property(e => e.RowVersion).OriginalValue = rowVersion;
+        List<TournamentMatch> matches = await context.TournamentMatches
+            .Where(m => m.TournamentId == tournamentId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        CanvasRoundMatchSync.ApplyTournamentMatchRounds(
+            matches,
+            canvasRounds.Select(r => r.WidthCells).ToList());
+        Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
+        if (!saveResult.IsSuccess)
+        {
+            return Result.Fail<Tournament>(saveResult.Error!);
+        }
+
+        return Result.Ok(tournament);
+    }
+
+    public async Task<Result<Tournament>> UpdateRoundsAsync(
+        int tournamentId,
+        IReadOnlyList<CanvasRoundInput> rounds,
+        byte[] rowVersion,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(rounds);
+        await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        Tournament? tournament = await context.Tournaments
+            .SingleOrDefaultAsync(t => t.TournamentId == tournamentId, cancellationToken)
+            .ConfigureAwait(false);
+        if (tournament is null)
+        {
+            return Result.Fail<Tournament>("Tournament not found.");
+        }
+
+        Result? validation = CanvasRoundValidation.ValidateInputs(rounds, tournament.GraphWidthCells);
+        if (validation is not null)
+        {
+            return Result.Fail<Tournament>(validation.Error!);
+        }
+
+        List<TournamentCanvasRound> existing = await context.TournamentCanvasRounds
+            .Where(r => r.TournamentId == tournamentId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        context.TournamentCanvasRounds.RemoveRange(existing);
+        for (int i = 0; i < rounds.Count; i++)
+        {
+            CanvasRoundInput round = rounds[i];
+            context.TournamentCanvasRounds.Add(new TournamentCanvasRound
+            {
+                TournamentId = tournamentId,
+                SortOrder = i,
+                WidthCells = round.WidthCells,
+                Scenario = round.Scenario,
+            });
+        }
+
+        context.Entry(tournament).Property(e => e.RowVersion).OriginalValue = rowVersion;
+        List<TournamentMatch> matches = await context.TournamentMatches
+            .Where(m => m.TournamentId == tournamentId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        CanvasRoundMatchSync.ApplyTournamentMatchRounds(
+            matches,
+            rounds.Select(r => r.WidthCells).ToList());
         Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
         if (!saveResult.IsSuccess)
         {
@@ -212,11 +319,19 @@ public sealed class TournamentBracketStore : ITournamentBracketStore
         (int positionX, int positionY) = BracketGraphLayout.CenterMatchPosition(
             tournament.GraphWidthCells,
             tournament.GraphHeightCells);
+        List<int> columnWidths = await context.TournamentCanvasRounds
+            .AsNoTracking()
+            .Where(r => r.TournamentId == tournamentId)
+            .OrderBy(r => r.SortOrder)
+            .Select(r => r.WidthCells)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
         var match = new TournamentMatch
         {
             TournamentId = tournamentId,
             PositionX = positionX,
             PositionY = positionY,
+            RoundNumber = BracketRoundLayout.GetRoundNumberForPosition(positionX, columnWidths),
             Status = TournamentMatchStatus.NotStarted,
             PlayMode = TournamentMatchPlayMode.Offline,
             Winner = TournamentMatchWinner.None,
@@ -251,33 +366,33 @@ public sealed class TournamentBracketStore : ITournamentBracketStore
         byte[] rowVersion,
         CancellationToken cancellationToken)
     {
-        return await UpdateMatchAsync(
-            tournamentMatchId,
-            rowVersion,
-            match =>
-            {
-                match.PositionX = positionX;
-                match.PositionY = positionY;
-            },
-            cancellationToken).ConfigureAwait(false);
-    }
-
-    public async Task<Result<TournamentMatch>> UpdateMatchRoundAsync(
-        int tournamentMatchId,
-        int? roundNumber,
-        byte[] rowVersion,
-        CancellationToken cancellationToken)
-    {
-        if (roundNumber is < 1)
+        await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        TournamentMatch? match = await context.TournamentMatches
+            .SingleOrDefaultAsync(m => m.TournamentMatchId == tournamentMatchId, cancellationToken)
+            .ConfigureAwait(false);
+        if (match is null)
         {
-            return Result.Fail<TournamentMatch>("Round must be at least 1.");
+            return Result.Fail<TournamentMatch>("Match not found.");
         }
 
-        return await UpdateMatchAsync(
-            tournamentMatchId,
-            rowVersion,
-            match => match.RoundNumber = roundNumber,
-            cancellationToken).ConfigureAwait(false);
+        match.PositionX = positionX;
+        match.PositionY = positionY;
+        List<int> columnWidths = await context.TournamentCanvasRounds
+            .AsNoTracking()
+            .Where(r => r.TournamentId == match.TournamentId)
+            .OrderBy(r => r.SortOrder)
+            .Select(r => r.WidthCells)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        match.RoundNumber = BracketRoundLayout.GetRoundNumberForPosition(positionX, columnWidths);
+        context.Entry(match).Property(e => e.RowVersion).OriginalValue = rowVersion;
+        Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
+        if (!saveResult.IsSuccess)
+        {
+            return Result.Fail<TournamentMatch>(saveResult.Error!);
+        }
+
+        return Result.Ok(match);
     }
 
     public async Task<Result> DeleteMatchAsync(int tournamentMatchId, byte[] rowVersion, CancellationToken cancellationToken)

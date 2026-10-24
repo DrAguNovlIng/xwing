@@ -30,6 +30,12 @@ public interface ITournamentTemplateStore
         byte[] rowVersion,
         CancellationToken cancellationToken);
 
+    Task<Result<TournamentTemplate>> UpdateRoundsAsync(
+        int tournamentTemplateId,
+        IReadOnlyList<CanvasRoundInput> rounds,
+        byte[] rowVersion,
+        CancellationToken cancellationToken);
+
     Task<Result> DeleteAsync(int tournamentTemplateId, byte[] rowVersion, CancellationToken cancellationToken);
 
     Task<Result<TemplateMatch>> AddMatchAsync(int tournamentTemplateId, CancellationToken cancellationToken);
@@ -44,12 +50,6 @@ public interface ITournamentTemplateStore
         int templateMatchId,
         int positionX,
         int positionY,
-        byte[] rowVersion,
-        CancellationToken cancellationToken);
-
-    Task<Result<TemplateMatch>> UpdateMatchRoundAsync(
-        int templateMatchId,
-        int? roundNumber,
         byte[] rowVersion,
         CancellationToken cancellationToken);
 
@@ -74,4 +74,5 @@ public interface ITournamentTemplateStore
 public sealed record TournamentTemplateGraph(
     TournamentTemplate Template,
     IReadOnlyList<TemplateMatch> Matches,
-    IReadOnlyList<TemplateMatchFeed> Feeds);
+    IReadOnlyList<TemplateMatchFeed> Feeds,
+    IReadOnlyList<TemplateCanvasRound> CanvasRounds);

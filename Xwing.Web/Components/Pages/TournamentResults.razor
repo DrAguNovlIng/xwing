@@ -48,13 +48,18 @@
     else
     {
         <TournamentStandingsPanel Participants="graph.Participants" Matches="graph.Matches" />
-        @if (graph.Matches.Count == 0)
+        @if (graph.Matches.Count == 0 && graph.CanvasRounds.Count == 0)
         {
             <MudText>No bracket has been set up for this tournament yet.</MudText>
         }
         else
         {
         <div class="results-canvas-frame">
+        <BracketRoundCanvas SurfaceWidth="@surfaceWidth"
+                            SurfaceHeight="@surfaceHeight"
+                            GraphWidthCells="@graph.Tournament.GraphWidthCells"
+                            Editable="false"
+                            Bands="@GetCanvasRoundBands()">
         <div class="template-graph-surface" style="@SurfaceStyle">
             <svg class="template-graph-edges" width="@surfaceWidth" height="@surfaceHeight" xmlns="http://www.w3.org/2000/svg">
                 <defs>
@@ -91,20 +96,13 @@
                             <MudChip T="string" Size="Size.Small" Color="Color.Info">Online</MudChip>
                         }
                     </div>
-                    @if (match.RoundNumber is not null || !string.IsNullOrEmpty(match.ReplayUrl))
+                    @if (!string.IsNullOrEmpty(match.ReplayUrl))
                     {
                         <div class="template-match-box-meta">
-                            @if (match.RoundNumber is int roundNum)
-                            {
-                                <MudText Typo="Typo.caption">Round @roundNum</MudText>
-                            }
-                            @if (!string.IsNullOrEmpty(match.ReplayUrl))
-                            {
-                                <MudLink Href="@match.ReplayUrl"
-                                         Target="_blank"
-                                         Typo="Typo.caption"
-                                         Class="template-match-box-meta-link">@GetReplayLinkLabel(match)</MudLink>
-                            }
+                            <MudLink Href="@match.ReplayUrl"
+                                     Target="_blank"
+                                     Typo="Typo.caption"
+                                     Class="template-match-box-meta-link">@GetReplayLinkLabel(match)</MudLink>
                         </div>
                     }
                     <MudText Typo="Typo.caption" Class="@GetSlotLineClass(match, TemplateMatchSlot.A)">A: @FormatSlot(match, TemplateMatchSlot.A)</MudText>
@@ -112,6 +110,7 @@
                 </div>
             }
         </div>
+        </BracketRoundCanvas>
         </div>
         }
         @if (!string.IsNullOrEmpty(graph.Tournament.FormatDescription))
@@ -189,6 +188,10 @@
             loading = false;
         }
     }
+
+    private IReadOnlyList<BracketRoundBandView> GetCanvasRoundBands() =>
+        graph?.CanvasRounds.Select(r => new BracketRoundBandView(r.WidthCells, r.Scenario)).ToList()
+        ?? [];
 
     private void StartLiveUpdates()
     {

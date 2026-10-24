@@ -22,6 +22,12 @@ public interface ITournamentBracketStore
         byte[] rowVersion,
         CancellationToken cancellationToken);
 
+    Task<Result<Tournament>> UpdateRoundsAsync(
+        int tournamentId,
+        IReadOnlyList<CanvasRoundInput> rounds,
+        byte[] rowVersion,
+        CancellationToken cancellationToken);
+
     Task<Result<TournamentMatch>> AddMatchAsync(int tournamentId, CancellationToken cancellationToken);
 
     Task<Result<TournamentMatch>> UpdateMatchNameAsync(
@@ -33,11 +39,6 @@ public interface ITournamentBracketStore
         int tournamentMatchId,
         int positionX,
         int positionY,
-        byte[] rowVersion,
-        CancellationToken cancellationToken);
-    Task<Result<TournamentMatch>> UpdateMatchRoundAsync(
-        int tournamentMatchId,
-        int? roundNumber,
         byte[] rowVersion,
         CancellationToken cancellationToken);
     Task<Result> DeleteMatchAsync(int tournamentMatchId, byte[] rowVersion, CancellationToken cancellationToken);

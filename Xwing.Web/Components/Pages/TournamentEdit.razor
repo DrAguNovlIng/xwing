@@ -77,6 +77,12 @@
     {
         <TournamentStandingsPanel Participants="graph.Participants" Matches="graph.Matches" />
         <div class="bracket-editor-stage">
+            <BracketRoundCanvas SurfaceWidth="@surfaceWidth"
+                                SurfaceHeight="@surfaceHeight"
+                                GraphWidthCells="@graph.Tournament.GraphWidthCells"
+                                Editable="true"
+                                Bands="@GetCanvasRoundBands()"
+                                SaveRoundsRequested="SaveCanvasRoundsAsync">
                 <div class="template-graph-surface @(draggingMatchId is not null ? "template-graph-surface-dragging" : string.Empty)"
                      style="@SurfaceStyle"
                      @onpointermove="OnSurfacePointerMove"
@@ -170,6 +176,7 @@
                         </div>
                     }
                 </div>
+            </BracketRoundCanvas>
             @if (selectedMatch is not null && matchEditorOpen)
             {
                     <MudPaper Class="pa-4 bracket-match-editor-panel" Elevation="4">
@@ -187,13 +194,6 @@
                                           Immediate="true"
                                           OnBlur="OnMatchNameBlurAsync" />
                         </div>
-                        <MudNumericField T="int?"
-                                         Value="editRoundNumber"
-                                         ValueChanged="OnEditRoundChangedAsync"
-                                         Label="Round"
-                                         Variant="Variant.Outlined"
-                                         Min="1"
-                                         Class="mb-4" />
                         <MudDivider Class="my-3" />
                         <MudText Typo="Typo.subtitle2" Class="mb-2">Results</MudText>
                         <MudSelect T="TournamentMatchStatus"
@@ -456,7 +456,6 @@
     private string slotBValue = OpenSlotValue;
     private string editSlotAOpenLabel = string.Empty;
     private string editSlotBOpenLabel = string.Empty;
-    private int? editRoundNumber;
     private TournamentMatchStatus editStatus = TournamentMatchStatus.NotStarted;
     private TournamentMatchPlayMode editPlayMode = TournamentMatchPlayMode.Offline;
     private string? editReplayUrl;
@@ -505,6 +504,31 @@
             selectedMatch = graph.Matches.FirstOrDefault(m => m.TournamentMatchId == selectedMatch.TournamentMatchId);
             SyncSidePanel();
         }
+    }
+
+    private IReadOnlyList<BracketRoundBandView> GetCanvasRoundBands() =>
+        graph?.CanvasRounds.Select(r => new BracketRoundBandView(r.WidthCells, r.Scenario)).ToList()
+        ?? [];
+
+    private async Task SaveCanvasRoundsAsync(IReadOnlyList<CanvasRoundInput> rounds)
+    {
+        if (graph is null)
+        {
+            return;
+        }
+
+        Result<Tournament> result = await BracketStore.UpdateRoundsAsync(
+            TournamentId,
+            rounds,
+            graph.Tournament.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Could not save rounds.", Severity.Error);
+            return;
+        }
+
+        await LoadGraphAsync();
     }
 
     private int surfaceWidth => graph is null
@@ -559,7 +583,6 @@
         slotBValue = GetSlotSelectValue(selectedMatch, TemplateMatchSlot.B);
         editSlotAOpenLabel = selectedMatch.SlotAOpenLabel ?? string.Empty;
         editSlotBOpenLabel = selectedMatch.SlotBOpenLabel ?? string.Empty;
-        editRoundNumber = selectedMatch.RoundNumber;
         editStatus = selectedMatch.Status;
         editPlayMode = selectedMatch.PlayMode;
         editReplayUrl = selectedMatch.ReplayUrl;
@@ -573,7 +596,6 @@
 
     private sealed record SidePanelSnapshot(
         string MatchName,
-        int? RoundNumber,
         TournamentMatchStatus Status,
         TournamentMatchPlayMode PlayMode,
         string? ReplayUrl,
@@ -589,7 +611,6 @@
     private SidePanelSnapshot CaptureSidePanelSnapshot() =>
         new(
             editMatchName,
-            editRoundNumber,
             editStatus,
             editPlayMode,
             editReplayUrl,
@@ -613,13 +634,6 @@
         }
 
         await SaveMatchNameForAsync(match, snapshot.MatchName);
-        match = FindMatchById(matchId);
-        if (match is null)
-        {
-            return;
-        }
-
-        await SaveMatchRoundForAsync(match, snapshot.RoundNumber);
         match = FindMatchById(matchId);
         if (match is null)
         {
@@ -801,24 +815,6 @@
     private static string? NormalizeFormatDescription(string? text) =>
         string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 
-    private async Task OnEditRoundChangedAsync(int? value)
-    {
-        int? boundId = _boundMatchId;
-        editRoundNumber = value;
-        if (boundId is not int matchId)
-        {
-            return;
-        }
-
-        TournamentMatch? match = FindMatchById(matchId);
-        if (match is null)
-        {
-            return;
-        }
-
-        await SaveMatchRoundForAsync(match, value);
-    }
-
     private Task OnEditStatusChangedAsync(TournamentMatchStatus value)
     {
         editStatus = value;
@@ -897,28 +893,6 @@
         if (!result.IsSuccess)
         {
             ShowStatus(result.Error ?? "Could not save name.", Severity.Error);
-            return;
-        }
-
-        await LoadGraphAsync();
-    }
-
-    private async Task SaveMatchRoundForAsync(TournamentMatch match, int? round)
-    {
-        match = RefreshMatch(match) ?? match;
-        if (round == match.RoundNumber)
-        {
-            return;
-        }
-
-        Result<TournamentMatch> result = await BracketStore.UpdateMatchRoundAsync(
-            match.TournamentMatchId,
-            round,
-            match.RowVersion,
-            CancellationToken.None);
-        if (!result.IsSuccess)
-        {
-            ShowStatus(result.Error ?? "Could not save round.", Severity.Error);
             return;
         }
 

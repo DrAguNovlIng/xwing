@@ -6,7 +6,8 @@ public sealed record TournamentBracketGraph(
     Tournament Tournament,
     IReadOnlyList<TournamentMatch> Matches,
     IReadOnlyList<TournamentMatchFeed> Feeds,
-    IReadOnlyList<TournamentBracketParticipant> Participants);
+    IReadOnlyList<TournamentBracketParticipant> Participants,
+    IReadOnlyList<TournamentCanvasRound> CanvasRounds);
 public sealed record TournamentBracketParticipant(int UserId, string UserName, bool IsActive);
 public sealed record TournamentMatchResultUpdate(
     TournamentMatchStatus Status,

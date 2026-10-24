@@ -19,6 +19,8 @@ public sealed class XwingDbContext : DbContext
     public DbSet<TemplateMatchFeed> TemplateMatchFeeds => Set<TemplateMatchFeed>();
     public DbSet<TournamentMatch> TournamentMatches => Set<TournamentMatch>();
     public DbSet<TournamentMatchFeed> TournamentMatchFeeds => Set<TournamentMatchFeed>();
+    public DbSet<TemplateCanvasRound> TemplateCanvasRounds => Set<TemplateCanvasRound>();
+    public DbSet<TournamentCanvasRound> TournamentCanvasRounds => Set<TournamentCanvasRound>();
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         StampTimes();
@@ -160,6 +162,34 @@ public sealed class XwingDbContext : DbContext
                 .WithMany(m => m.OutgoingFeeds)
                 .HasForeignKey(e => e.SourceTournamentMatchId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<TemplateCanvasRound>(entity =>
+        {
+            entity.ToTable("TemplateCanvasRounds");
+            entity.HasKey(e => e.TemplateCanvasRoundId);
+            entity.Property(e => e.TemplateCanvasRoundId).UseIdentityColumn();
+            entity.Property(e => e.Scenario).HasConversion<int>();
+            entity.Property(e => e.TimeCreatedUtc).HasColumnType("datetimeoffset");
+            entity.Property(e => e.TimeUpdatedUtc).HasColumnType("datetimeoffset");
+            entity.HasIndex(e => new { e.TournamentTemplateId, e.SortOrder }).IsUnique();
+            entity.HasOne(e => e.TournamentTemplate)
+                .WithMany()
+                .HasForeignKey(e => e.TournamentTemplateId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<TournamentCanvasRound>(entity =>
+        {
+            entity.ToTable("TournamentCanvasRounds");
+            entity.HasKey(e => e.TournamentCanvasRoundId);
+            entity.Property(e => e.TournamentCanvasRoundId).UseIdentityColumn();
+            entity.Property(e => e.Scenario).HasConversion<int>();
+            entity.Property(e => e.TimeCreatedUtc).HasColumnType("datetimeoffset");
+            entity.Property(e => e.TimeUpdatedUtc).HasColumnType("datetimeoffset");
+            entity.HasIndex(e => new { e.TournamentId, e.SortOrder }).IsUnique();
+            entity.HasOne(e => e.Tournament)
+                .WithMany()
+                .HasForeignKey(e => e.TournamentId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
         modelBuilder.Entity<TemplateMatchFeed>(entity =>
         {

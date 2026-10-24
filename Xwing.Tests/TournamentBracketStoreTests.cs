@@ -17,7 +17,7 @@ public sealed class TournamentBracketStoreTests
     }
 
     [Fact]
-    public async Task AssignTemplateShouldCopyRoundAndFeeds()
+    public async Task AssignTemplateShouldCopyCanvasRoundsAndDeriveMatchRound()
     {
         TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
             connectionString,
@@ -27,14 +27,26 @@ public sealed class TournamentBracketStoreTests
             Result<TournamentTemplate> template = await stores.Templates.CreateAsync(
                 "Swiss",
                 TestContext.Current.CancellationToken);
-            Result<TemplateMatch> match = await stores.Templates.AddMatchAsync(
+            CanvasRoundInput[] rounds =
+            [
+                new(XwaScenario.ChanceEngagement, 15),
+                new(XwaScenario.SalvageMission, 15),
+            ];
+            await stores.Templates.UpdateRoundsAsync(
                 template.Value!.TournamentTemplateId,
+                rounds,
+                template.Value.RowVersion,
                 TestContext.Current.CancellationToken);
-            await stores.Templates.UpdateMatchRoundAsync(
+            Result<TemplateMatch> match = await stores.Templates.AddMatchAsync(
+                template.Value.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            Result<TemplateMatch> moved = await stores.Templates.UpdateMatchPositionAsync(
                 match.Value!.TemplateMatchId,
-                2,
+                16,
+                match.Value.PositionY,
                 match.Value.RowVersion,
                 TestContext.Current.CancellationToken);
+            moved.Value!.RoundNumber.ShouldBe(2);
             Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
                 "Event",
                 DefaultStart,
@@ -49,8 +61,80 @@ public sealed class TournamentBracketStoreTests
                 tournament.Value.TournamentId,
                 TestContext.Current.CancellationToken);
             graph.IsSuccess.ShouldBeTrue();
-            graph.Value!.Matches.Single().RoundNumber.ShouldBe(2);
+            graph.Value!.CanvasRounds.Count.ShouldBe(2);
+            graph.Value.CanvasRounds[1].Scenario.ShouldBe(XwaScenario.SalvageMission);
+            graph.Value.Matches.Single().RoundNumber.ShouldBe(2);
             graph.Value.Matches.Single().Status.ShouldBe(TournamentMatchStatus.NotStarted);
+        }
+    }
+
+    [Fact]
+    public async Task UpdateRoundsAsyncShouldRejectWidthsThatDoNotFillCanvas()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+                "Event",
+                DefaultStart,
+                DefaultEnd,
+                TestContext.Current.CancellationToken);
+            CanvasRoundInput[] rounds =
+            [
+                new(XwaScenario.AssaultAtSatelliteArray, 10),
+                new(XwaScenario.AssaultAtSatelliteArray, 10),
+            ];
+            Result<Tournament> saved = await stores.Brackets.UpdateRoundsAsync(
+                tournament.Value!.TournamentId,
+                rounds,
+                tournament.Value.RowVersion,
+                TestContext.Current.CancellationToken);
+            saved.IsSuccess.ShouldBeFalse();
+        }
+    }
+
+    [Fact]
+    public async Task UpdateGraphSizeShouldRejectShrinkWhenLastRoundTooNarrow()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<TournamentTemplate> template = await stores.Templates.CreateAsync(
+                "Sized",
+                TestContext.Current.CancellationToken);
+            CanvasRoundInput[] rounds =
+            [
+                new(XwaScenario.AssaultAtSatelliteArray, 15),
+                new(XwaScenario.AssaultAtSatelliteArray, 15),
+            ];
+            await stores.Templates.UpdateRoundsAsync(
+                template.Value!.TournamentTemplateId,
+                rounds,
+                template.Value.RowVersion,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+                "Event",
+                DefaultStart,
+                DefaultEnd,
+                TestContext.Current.CancellationToken);
+            await stores.Brackets.AssignTemplateAsync(
+                tournament.Value!.TournamentId,
+                template.Value.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            Result<TournamentBracketGraph> graph = await stores.Brackets.GetGraphAsync(
+                tournament.Value.TournamentId,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> shrunk = await stores.Brackets.UpdateGraphSizeAsync(
+                tournament.Value.TournamentId,
+                24,
+                graph.Value!.Tournament.GraphHeightCells,
+                graph.Value.Tournament.RowVersion,
+                TestContext.Current.CancellationToken);
+            shrunk.IsSuccess.ShouldBeFalse();
         }
     }
 

@@ -4,6 +4,7 @@
 
 @using Xwing.Web.Data
 @using Xwing.Web.Models
+@using Xwing.Web.Stores
 @inject ITournamentTemplateStore TemplateStore
 @inject NavigationManager Navigation
 
@@ -58,6 +59,12 @@
     else
     {
         <div class="bracket-editor-stage">
+            <BracketRoundCanvas SurfaceWidth="@surfaceWidth"
+                                SurfaceHeight="@surfaceHeight"
+                                GraphWidthCells="@graph.Template.GraphWidthCells"
+                                Editable="true"
+                                Bands="@GetCanvasRoundBands()"
+                                SaveRoundsRequested="SaveCanvasRoundsAsync">
                 <div class="template-graph-surface @(draggingMatchId is not null ? "template-graph-surface-dragging" : string.Empty)"
                      style="@SurfaceStyle"
                      @onpointermove="OnSurfacePointerMove"
@@ -143,6 +150,7 @@
                         </div>
                     }
                 </div>
+            </BracketRoundCanvas>
             @if (selectedMatch is not null && matchEditorOpen)
             {
                     <MudPaper Class="pa-4 bracket-match-editor-panel" Elevation="4">
@@ -160,13 +168,6 @@
                                           Immediate="true"
                                           OnBlur="OnMatchNameBlurAsync" />
                         </div>
-                        <MudNumericField T="int?"
-                                         Value="editRoundNumber"
-                                         ValueChanged="OnEditRoundChangedAsync"
-                                         Label="Round"
-                                         Variant="Variant.Outlined"
-                                         Min="1"
-                                         Class="mb-4" />
                         <MudSelect T="string"
                                    Label="Slot A"
                                    Variant="Variant.Outlined"
@@ -351,7 +352,6 @@
     private string slotBValue = OpenSlotValue;
     private string editSlotAOpenLabel = string.Empty;
     private string editSlotBOpenLabel = string.Empty;
-    private int? editRoundNumber;
     private string pageTitle = "Template";
     private string? statusMessage;
     private Severity statusSeverity = Severity.Info;
@@ -441,13 +441,11 @@
         slotBValue = GetSlotSelectValue(selectedMatch, TemplateMatchSlot.B);
         editSlotAOpenLabel = selectedMatch.SlotAOpenLabel ?? string.Empty;
         editSlotBOpenLabel = selectedMatch.SlotBOpenLabel ?? string.Empty;
-        editRoundNumber = selectedMatch.RoundNumber;
         _boundMatchId = selectedMatch.TemplateMatchId;
     }
 
     private sealed record SidePanelSnapshot(
         string MatchName,
-        int? RoundNumber,
         string SlotAValue,
         string SlotBValue,
         string SlotAOpenLabel,
@@ -456,11 +454,35 @@
     private SidePanelSnapshot CaptureSidePanelSnapshot() =>
         new(
             editMatchName,
-            editRoundNumber,
             slotAValue,
             slotBValue,
             editSlotAOpenLabel,
             editSlotBOpenLabel);
+
+    private IReadOnlyList<BracketRoundBandView> GetCanvasRoundBands() =>
+        graph?.CanvasRounds.Select(r => new BracketRoundBandView(r.WidthCells, r.Scenario)).ToList()
+        ?? [];
+
+    private async Task SaveCanvasRoundsAsync(IReadOnlyList<CanvasRoundInput> rounds)
+    {
+        if (graph is null)
+        {
+            return;
+        }
+
+        Result<TournamentTemplate> result = await TemplateStore.UpdateRoundsAsync(
+            graph.Template.TournamentTemplateId,
+            rounds,
+            graph.Template.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Could not save rounds.", Severity.Error);
+            return;
+        }
+
+        await LoadGraphAsync();
+    }
 
     private TemplateMatch? FindMatchById(int matchId) =>
         graph?.Matches.FirstOrDefault(m => m.TemplateMatchId == matchId);
@@ -474,13 +496,6 @@
         }
 
         await SaveMatchNameForAsync(match, snapshot.MatchName);
-        match = FindMatchById(matchId);
-        if (match is null)
-        {
-            return;
-        }
-
-        await SaveMatchRoundForAsync(match, snapshot.RoundNumber);
         match = FindMatchById(matchId);
         if (match is null)
         {
@@ -524,46 +539,6 @@
         }
 
         await LoadGraphAsync();
-    }
-
-    private async Task SaveMatchRoundForAsync(TemplateMatch match, int? round)
-    {
-        match = RefreshMatch(match) ?? match;
-        if (round == match.RoundNumber)
-        {
-            return;
-        }
-
-        Result<TemplateMatch> result = await TemplateStore.UpdateMatchRoundAsync(
-            match.TemplateMatchId,
-            round,
-            match.RowVersion,
-            CancellationToken.None);
-        if (!result.IsSuccess)
-        {
-            ShowStatus(result.Error ?? "Could not save round.", Severity.Error);
-            return;
-        }
-
-        await LoadGraphAsync();
-    }
-
-    private async Task OnEditRoundChangedAsync(int? value)
-    {
-        int? boundId = _boundMatchId;
-        editRoundNumber = value;
-        if (boundId is not int matchId)
-        {
-            return;
-        }
-
-        TemplateMatch? match = FindMatchById(matchId);
-        if (match is null)
-        {
-            return;
-        }
-
-        await SaveMatchRoundForAsync(match, value);
     }
 
     private async Task SaveSlotOpenLabelForAsync(TemplateMatch match, TemplateMatchSlot slot, string label)

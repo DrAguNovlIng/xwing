@@ -286,6 +286,56 @@ public sealed class TournamentTemplateStoreTests
     }
 
     [Fact]
+    public async Task UpdateRoundsAsyncShouldSaveClearAndSyncMatchRound()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<TournamentTemplate> template = await stores.Templates.CreateAsync(
+                "Rounds",
+                TestContext.Current.CancellationToken);
+            CanvasRoundInput[] rounds =
+            [
+                new(XwaScenario.ScrambleTheTransmissions, 15),
+                new(XwaScenario.AncientKnowledge, 15),
+            ];
+            Result<TournamentTemplate> saved = await stores.Templates.UpdateRoundsAsync(
+                template.Value!.TournamentTemplateId,
+                rounds,
+                template.Value.RowVersion,
+                TestContext.Current.CancellationToken);
+            saved.IsSuccess.ShouldBeTrue();
+            Result<TemplateMatch> match = await stores.Templates.AddMatchAsync(
+                template.Value.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            Result<TemplateMatch> moved = await stores.Templates.UpdateMatchPositionAsync(
+                match.Value!.TemplateMatchId,
+                16,
+                match.Value.PositionY,
+                match.Value.RowVersion,
+                TestContext.Current.CancellationToken);
+            moved.Value!.RoundNumber.ShouldBe(2);
+            Result<TournamentTemplateGraph> graph = await stores.Templates.GetGraphAsync(
+                template.Value.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            graph.Value!.CanvasRounds.Count.ShouldBe(2);
+            Result<TournamentTemplate> cleared = await stores.Templates.UpdateRoundsAsync(
+                template.Value.TournamentTemplateId,
+                [],
+                saved.Value!.RowVersion,
+                TestContext.Current.CancellationToken);
+            cleared.IsSuccess.ShouldBeTrue();
+            graph = await stores.Templates.GetGraphAsync(
+                template.Value.TournamentTemplateId,
+                TestContext.Current.CancellationToken);
+            graph.Value!.CanvasRounds.ShouldBeEmpty();
+            graph.Value.Matches.Single().RoundNumber.ShouldBeNull();
+        }
+    }
+
+    [Fact]
     public async Task UpdateFormatDescriptionAsyncShouldSaveAndClear()
     {
         TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(

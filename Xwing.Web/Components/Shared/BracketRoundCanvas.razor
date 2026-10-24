@@ -1,0 +1,246 @@
+@using Xwing.Web.Data
+@using Xwing.Web.Models
+@using Xwing.Web.Stores
+@inject IJSRuntime Js
+
+<div class="bracket-round-canvas-stack" style="width: @(SurfaceWidth)px">
+    @if (columnBands.Count > 0)
+    {
+        <div class="bracket-round-header-row" style="width: @(SurfaceWidth)px">
+            @for (int i = 0; i < columnBands.Count; i++)
+            {
+                int columnIndex = i;
+                BracketRoundBandView band = columnBands[i];
+                int headerWidthPx = band.WidthCells * BracketGraphLayout.CellSize;
+                <div class="bracket-round-header-cell" style="width: @(headerWidthPx)px">
+                    <MudText Typo="Typo.caption" Class="bracket-round-header-label">Round @(columnIndex + 1)</MudText>
+                    @if (Editable)
+                    {
+                        <MudSelect T="XwaScenario?"
+                                   Value="band.Scenario"
+                                   ValueChanged="value => OnScenarioChangedAsync(columnIndex, value)"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense"
+                                   Dense="true"
+                                   Class="bracket-round-scenario-select">
+                            <MudSelectItem T="XwaScenario?" Value="@((XwaScenario?)null)">—</MudSelectItem>
+                            @foreach (XwaScenario scenario in XwaScenarios.All)
+                            {
+                                <MudSelectItem T="XwaScenario?" Value="@scenario">@XwaScenarios.GetDisplayLabel(scenario)</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Size="Size.Small"
+                                       aria-label="Remove round column"
+                                       OnClick="@(() => RemoveColumnAsync(columnIndex))" />
+                    }
+                    else if (band.Scenario is not null)
+                    {
+                        <MudText Typo="Typo.body2" Class="bracket-round-scenario-readonly">@XwaScenarios.GetDisplayLabel(band.Scenario)</MudText>
+                    }
+                </div>
+            }
+        </div>
+    }
+    <div @ref="surfaceHost"
+         class="bracket-round-surface-host"
+         style="width: @(SurfaceWidth)px; height: @(SurfaceHeight)px"
+         @onpointermove="OnBoundaryPointerMove"
+         @onpointerup="OnBoundaryPointerUp"
+         @onpointercancel="OnBoundaryPointerUp">
+        @ChildContent
+        @if (columnBands.Count > 0)
+        {
+            int[] widths = columnBands.Select(b => b.WidthCells).ToArray();
+            @for (int boundaryIndex = 0; boundaryIndex < columnBands.Count - 1; boundaryIndex++)
+            {
+                int capturedBoundary = boundaryIndex;
+                int linePx = BracketRoundLayout.GetBoundaryCellX(capturedBoundary, widths) * BracketGraphLayout.CellSize;
+                <div class="bracket-round-boundary-line" style="left: @(linePx)px"></div>
+                @if (Editable)
+                {
+                    <div class="bracket-round-boundary-handle"
+                         style="left: @(linePx - 6)px"
+                         @onpointerdown="@(e => StartBoundaryDragAsync(e, capturedBoundary))"
+                         @onpointerdown:stopPropagation="true"
+                         @onpointerdown:preventDefault="true"></div>
+                }
+            }
+        }
+    </div>
+    @if (Editable)
+    {
+        <MudButton Variant="Variant.Outlined"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.ViewColumn"
+                   Class="mt-2"
+                   OnClick="AddRoundAsync">
+            Add round
+        </MudButton>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int SurfaceWidth { get; set; }
+
+    [Parameter]
+    public int SurfaceHeight { get; set; }
+
+    [Parameter]
+    public int GraphWidthCells { get; set; }
+
+    [Parameter]
+    public bool Editable { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<BracketRoundBandView> Bands { get; set; } = [];
+
+    [Parameter]
+    public EventCallback<IReadOnlyList<CanvasRoundInput>> SaveRoundsRequested { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private List<BracketRoundBandView> columnBands = [];
+    private ElementReference surfaceHost;
+    private int? draggingBoundaryIndex;
+    private double dragStartClientX;
+    private int[]? dragStartWidths;
+
+    protected override void OnParametersSet()
+    {
+        if (draggingBoundaryIndex is not null)
+        {
+            return;
+        }
+
+        columnBands = Bands.Select(b => new BracketRoundBandView(b.WidthCells, b.Scenario)).ToList();
+    }
+
+    private async Task AddRoundAsync()
+    {
+        List<int> widths = columnBands.Select(b => b.WidthCells).ToList();
+        List<XwaScenario?> scenarios = columnBands.Select(b => b.Scenario).ToList();
+        Result<List<int>> layoutResult;
+        if (widths.Count == 0)
+        {
+            layoutResult = BracketRoundLayout.TryCreateInitialSplit(GraphWidthCells);
+            if (!layoutResult.IsSuccess)
+            {
+                return;
+            }
+
+            widths = layoutResult.Value!;
+            scenarios = [null, null];
+        }
+        else
+        {
+            layoutResult = BracketRoundLayout.TryAddColumn(widths);
+            if (!layoutResult.IsSuccess)
+            {
+                return;
+            }
+
+            widths = layoutResult.Value!;
+            scenarios.Add(null);
+        }
+
+        await SaveBandsAsync(widths, scenarios).ConfigureAwait(false);
+    }
+
+    private async Task RemoveColumnAsync(int columnIndex)
+    {
+        int[] widths = columnBands.Select(b => b.WidthCells).ToArray();
+        Result<List<int>> layoutResult = BracketRoundLayout.TryRemoveColumn(widths, columnIndex);
+        if (!layoutResult.IsSuccess)
+        {
+            return;
+        }
+
+        List<XwaScenario?> scenarios = columnBands.Select(b => b.Scenario).ToList();
+        if (layoutResult.Value!.Count == 0)
+        {
+            await SaveBandsAsync([], []).ConfigureAwait(false);
+            return;
+        }
+
+        scenarios.RemoveAt(columnIndex);
+        await SaveBandsAsync(layoutResult.Value, scenarios).ConfigureAwait(false);
+    }
+
+    private async Task OnScenarioChangedAsync(int columnIndex, XwaScenario? scenario)
+    {
+        List<int> widths = columnBands.Select(b => b.WidthCells).ToList();
+        List<XwaScenario?> scenarios = columnBands.Select(b => b.Scenario).ToList();
+        scenarios[columnIndex] = scenario;
+        await SaveBandsAsync(widths, scenarios).ConfigureAwait(false);
+    }
+
+    private async Task StartBoundaryDragAsync(PointerEventArgs args, int boundaryIndex)
+    {
+        if (!Editable)
+        {
+            return;
+        }
+
+        draggingBoundaryIndex = boundaryIndex;
+        dragStartClientX = args.ClientX;
+        dragStartWidths = columnBands.Select(b => b.WidthCells).ToArray();
+        await Js.InvokeVoidAsync("xwingTheme.capturePointer", surfaceHost, args.PointerId).ConfigureAwait(false);
+    }
+
+    private void OnBoundaryPointerMove(PointerEventArgs args)
+    {
+        if (draggingBoundaryIndex is not int boundaryIndex || dragStartWidths is null)
+        {
+            return;
+        }
+
+        int deltaCells = (int)Math.Round((args.ClientX - dragStartClientX) / BracketGraphLayout.CellSize);
+        Result<List<int>> resized = BracketRoundLayout.TryResizeBoundary(dragStartWidths, boundaryIndex, deltaCells);
+        if (!resized.IsSuccess)
+        {
+            return;
+        }
+
+        List<XwaScenario?> scenarios = columnBands.Select(b => b.Scenario).ToList();
+        columnBands = resized.Value!.Zip(scenarios, (w, s) => new BracketRoundBandView(w, s)).ToList();
+    }
+
+    private async Task OnBoundaryPointerUp()
+    {
+        if (draggingBoundaryIndex is null || dragStartWidths is null)
+        {
+            return;
+        }
+
+        int[] current = columnBands.Select(b => b.WidthCells).ToArray();
+        int[] original = dragStartWidths;
+        draggingBoundaryIndex = null;
+        dragStartWidths = null;
+        if (current.SequenceEqual(original))
+        {
+            return;
+        }
+
+        List<XwaScenario?> scenarios = columnBands.Select(b => b.Scenario).ToList();
+        await SaveBandsAsync(current.ToList(), scenarios).ConfigureAwait(false);
+    }
+
+    private async Task SaveBandsAsync(IReadOnlyList<int> widths, IReadOnlyList<XwaScenario?> scenarios)
+    {
+        if (widths.Count != scenarios.Count)
+        {
+            return;
+        }
+
+        var inputs = new CanvasRoundInput[widths.Count];
+        for (int i = 0; i < widths.Count; i++)
+        {
+            inputs[i] = new CanvasRoundInput(scenarios[i], widths[i]);
+        }
+
+        await SaveRoundsRequested.InvokeAsync(inputs).ConfigureAwait(false);
+    }
+}

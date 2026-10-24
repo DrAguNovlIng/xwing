@@ -304,6 +304,72 @@ h1:focus {
     align-self: flex-start;
 }
 
+.bracket-round-canvas-stack {
+    align-self: flex-start;
+    max-width: 100%;
+}
+
+.bracket-round-header-row {
+    display: flex;
+    flex-direction: row;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    background: var(--mud-palette-surface);
+}
+
+.bracket-round-header-cell {
+    box-sizing: border-box;
+    padding: 6px 8px;
+    border-right: 1px solid var(--mud-palette-lines-default);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.bracket-round-header-cell:last-child {
+    border-right: none;
+}
+
+.bracket-round-scenario-select {
+    font-size: 0.75rem;
+}
+
+.bracket-round-scenario-readonly {
+    line-height: 1.25;
+    word-break: break-word;
+}
+
+.bracket-round-surface-host {
+    position: relative;
+}
+
+.bracket-round-boundary-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+    background: color-mix(in srgb, var(--mud-palette-primary) 55%, transparent);
+    pointer-events: none;
+    z-index: 5;
+}
+
+.bracket-round-boundary-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 12px;
+    cursor: col-resize;
+    z-index: 6;
+    touch-action: none;
+}
+
+.bracket-round-surface-host .template-graph-surface {
+    border-radius: 0 0 4px 4px;
+}
+
 .format-description-field,
 .format-description-display {
     width: 100%;
