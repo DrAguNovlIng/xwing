@@ -298,15 +298,21 @@
         string? replayWatchUrl,
         string? replayDisplayCode,
         bool canEditReplayCode) =>
-        replayWatchUrl is not null
-        || canEditReplayCode
-        || (match.Status == TournamentMatchStatus.InProgress && !string.IsNullOrEmpty(replayDisplayCode));
+        match.PlayMode == TournamentMatchPlayMode.Online
+        && (replayWatchUrl is not null
+            || canEditReplayCode
+            || (match.Status == TournamentMatchStatus.InProgress && !string.IsNullOrEmpty(replayDisplayCode)));
 
     private bool ShowReplayMetaRow(TournamentMatch match, string? replayWatchUrl, string? replayDisplayCode) =>
         ShowReplayMetaRow(match, replayWatchUrl, replayDisplayCode, CanEditReplayCode(match));
 
     private bool CanEditReplayCode(TournamentMatch match)
     {
+        if (match.PlayMode != TournamentMatchPlayMode.Online)
+        {
+            return false;
+        }
+
         if (isAdmin)
         {
             return true;

@@ -215,14 +215,17 @@
                             <MudSelectItem Value="TournamentMatchPlayMode.Offline">Offline</MudSelectItem>
                             <MudSelectItem Value="TournamentMatchPlayMode.Online">Online</MudSelectItem>
                         </MudSelect>
-                        <div @onfocusin="OnReplayUrlFocus">
-                            <MudTextField @bind-Value="editReplayUrl"
-                                          Label="@ReplayUrlFieldLabel"
-                                          Variant="Variant.Outlined"
-                                          Class="mb-2"
-                                          Immediate="true"
-                                          OnBlur="OnReplayUrlBlurAsync" />
-                        </div>
+                        @if (editPlayMode == TournamentMatchPlayMode.Online)
+                        {
+                            <div @onfocusin="OnReplayUrlFocus">
+                                <MudTextField @bind-Value="editReplayUrl"
+                                              Label="@ReplayUrlFieldLabel"
+                                              Variant="Variant.Outlined"
+                                              Class="mb-2"
+                                              Immediate="true"
+                                              OnBlur="OnReplayUrlBlurAsync" />
+                            </div>
+                        }
                         <MudSelect T="int?"
                                    Label="Slot A player"
                                    Variant="Variant.Outlined"
@@ -266,12 +269,13 @@
                         <MudSelect T="TournamentMatchWinner"
                                    Value="editWinner"
                                    ValueChanged="OnEditWinnerChangedAsync"
+                                   ToStringFunc="FormatWinnerOption"
                                    Label="Winner"
                                    Variant="Variant.Outlined"
                                    Class="mb-4">
                             <MudSelectItem Value="TournamentMatchWinner.None">Neither</MudSelectItem>
-                            <MudSelectItem Value="TournamentMatchWinner.SlotA">Slot A</MudSelectItem>
-                            <MudSelectItem Value="TournamentMatchWinner.SlotB">Slot B</MudSelectItem>
+                            <MudSelectItem Value="TournamentMatchWinner.SlotA">@FormatWinnerOption(TournamentMatchWinner.SlotA)</MudSelectItem>
+                            <MudSelectItem Value="TournamentMatchWinner.SlotB">@FormatWinnerOption(TournamentMatchWinner.SlotB)</MudSelectItem>
                         </MudSelect>
                         <MudDivider Class="my-3" />
                         <MudSelect T="string"
@@ -854,7 +858,31 @@
     private Task OnEditWinnerChangedAsync(TournamentMatchWinner value)
     {
         editWinner = value;
+        if (value != TournamentMatchWinner.None)
+        {
+            editStatus = TournamentMatchStatus.Finished;
+        }
+
         return SaveBoundMatchResultAsync();
+    }
+
+    private string FormatWinnerOption(TournamentMatchWinner winner) =>
+        winner switch
+        {
+            TournamentMatchWinner.SlotA => FormatWinnerSlotLabel(editSlotAUserId, "Slot A"),
+            TournamentMatchWinner.SlotB => FormatWinnerSlotLabel(editSlotBUserId, "Slot B"),
+            _ => "Neither",
+        };
+
+    private string FormatWinnerSlotLabel(int? userId, string slotLabel)
+    {
+        if (userId is not int id || graph is null)
+        {
+            return slotLabel;
+        }
+
+        string name = graph.Participants.FirstOrDefault(p => p.UserId == id)?.UserName ?? $"User {id}";
+        return $"{name} ({slotLabel})";
     }
 
     private async Task SaveBoundMatchResultAsync()
