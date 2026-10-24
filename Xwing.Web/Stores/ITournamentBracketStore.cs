@@ -62,4 +62,13 @@ public interface ITournamentBracketStore
         TournamentMatchResultUpdate update,
         byte[] rowVersion,
         CancellationToken cancellationToken);
+
+    Task<Result<TournamentMatch>> UpdateReplayCodeAsync(
+        int tournamentId,
+        int tournamentMatchId,
+        string? replayCodeInput,
+        int actingUserId,
+        bool actingUserIsAdmin,
+        byte[] rowVersion,
+        CancellationToken cancellationToken);
 }

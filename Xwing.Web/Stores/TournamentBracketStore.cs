@@ -605,20 +605,63 @@ public sealed class TournamentBracketStore : ITournamentBracketStore
             return Result.Fail<TournamentMatch>(participantValidation.Error!);
         }
 
-        string? replayUrl = NormalizeReplayUrl(update.ReplayUrl);
-        if (update.ReplayUrl is not null && replayUrl is null && !string.IsNullOrWhiteSpace(update.ReplayUrl))
+        Result? replayValidation = FourGgReplay.ValidateAndNormalize(update.ReplayUrl, out string? replayCode);
+        if (replayValidation is not null)
         {
-            return Result.Fail<TournamentMatch>("Replay URL must be a valid http or https address.");
+            return Result.Fail<TournamentMatch>(replayValidation.Error!);
         }
 
         match.Status = update.Status;
         match.PlayMode = update.PlayMode;
-        match.ReplayUrl = replayUrl;
+        match.ReplayUrl = replayCode;
         match.SlotAUserId = update.SlotAUserId;
         match.SlotBUserId = update.SlotBUserId;
         match.SlotAPoints = update.SlotAPoints;
         match.SlotBPoints = update.SlotBPoints;
         match.Winner = update.Winner;
+        context.Entry(match).Property(e => e.RowVersion).OriginalValue = rowVersion;
+        Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
+        if (!saveResult.IsSuccess)
+        {
+            return Result.Fail<TournamentMatch>(saveResult.Error!);
+        }
+
+        return Result.Ok(match);
+    }
+
+    public async Task<Result<TournamentMatch>> UpdateReplayCodeAsync(
+        int tournamentId,
+        int tournamentMatchId,
+        string? replayCodeInput,
+        int actingUserId,
+        bool actingUserIsAdmin,
+        byte[] rowVersion,
+        CancellationToken cancellationToken)
+    {
+        await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        TournamentMatch? match = await context.TournamentMatches
+            .SingleOrDefaultAsync(
+                m => m.TournamentMatchId == tournamentMatchId && m.TournamentId == tournamentId,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (match is null)
+        {
+            return Result.Fail<TournamentMatch>("Match not found.");
+        }
+
+        bool isParticipant = match.SlotAUserId == actingUserId || match.SlotBUserId == actingUserId;
+        if (!actingUserIsAdmin && !isParticipant)
+        {
+            return Result.Fail<TournamentMatch>("You cannot change the replay code for this match.");
+        }
+
+        Result? replayValidation = FourGgReplay.ValidateAndNormalize(replayCodeInput, out string? replayCode);
+        if (replayValidation is not null)
+        {
+            return Result.Fail<TournamentMatch>(replayValidation.Error!);
+        }
+
+        match.ReplayUrl = replayCode;
         context.Entry(match).Property(e => e.RowVersion).OriginalValue = rowVersion;
         Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
         if (!saveResult.IsSuccess)
@@ -716,24 +759,6 @@ public sealed class TournamentBracketStore : ITournamentBracketStore
         }
 
         return null;
-    }
-
-    [SuppressMessage("Design", "CA1054:URI-like parameters should not be strings", Justification = "Parsed before persistence.")]
-    private static string? NormalizeReplayUrl(string? replayUrl)
-    {
-        if (string.IsNullOrWhiteSpace(replayUrl))
-        {
-            return null;
-        }
-
-        string trimmed = replayUrl.Trim();
-        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? uri) ||
-            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
-        {
-            return null;
-        }
-
-        return trimmed;
     }
 
     private async Task<Result<TournamentMatch>> UpdateMatchAsync(

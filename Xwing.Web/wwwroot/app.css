@@ -468,6 +468,22 @@ h1:focus {
     flex-shrink: 0;
 }
 
+.template-match-box-replay-code {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    margin-bottom: 2px;
+}
+
+.template-match-box-replay-code-value {
+    font-family: var(--mud-typography-monospace-family, ui-monospace, monospace);
+    font-size: 0.7rem;
+    line-height: 1.2;
+    user-select: all;
+    word-break: break-all;
+}
+
 .slot-line {
     display: block;
     line-height: 1.3;

@@ -585,7 +585,7 @@
         editSlotBOpenLabel = selectedMatch.SlotBOpenLabel ?? string.Empty;
         editStatus = selectedMatch.Status;
         editPlayMode = selectedMatch.PlayMode;
-        editReplayUrl = selectedMatch.ReplayUrl;
+        editReplayUrl = FourGgReplay.GetCodeForDisplay(selectedMatch.ReplayUrl) ?? string.Empty;
         editSlotAUserId = selectedMatch.SlotAUserId;
         editSlotBUserId = selectedMatch.SlotBUserId;
         editSlotAPoints = selectedMatch.SlotAPoints;
@@ -1052,7 +1052,7 @@
     private static bool HasPendingResultChangesFor(TournamentMatch match, SidePanelSnapshot snapshot) =>
         snapshot.Status != match.Status
         || snapshot.PlayMode != match.PlayMode
-        || !string.Equals(snapshot.ReplayUrl ?? string.Empty, match.ReplayUrl ?? string.Empty, StringComparison.Ordinal)
+        || ReplayFieldChanged(match, snapshot.ReplayUrl)
         || snapshot.SlotAUserId != match.SlotAUserId
         || snapshot.SlotBUserId != match.SlotBUserId
         || snapshot.SlotAPoints != match.SlotAPoints
@@ -1092,8 +1092,24 @@
         graph!.Matches.Where(m => m.TournamentMatchId != match.TournamentMatchId);
     private static string DisplayName(TournamentMatch match) =>
         string.IsNullOrWhiteSpace(match.Name) ? $"Match {match.TournamentMatchId}" : match.Name!;
-    private string ReplayUrlFieldLabel =>
-        editStatus == TournamentMatchStatus.Finished ? "Replay URL" : "Match URL";
+    private const string ReplayUrlFieldLabel = "Replay code";
+
+    private static bool ReplayFieldChanged(TournamentMatch match, string? editReplayCode)
+    {
+        FourGgReplay.ValidateAndNormalize(editReplayCode, out string? desired);
+        string? currentCode = FourGgReplay.GetCodeForDisplay(match.ReplayUrl);
+        if (currentCode is not null)
+        {
+            return !string.Equals(currentCode, desired ?? string.Empty, StringComparison.Ordinal);
+        }
+
+        if (!string.IsNullOrWhiteSpace(match.ReplayUrl))
+        {
+            return !string.IsNullOrWhiteSpace(desired);
+        }
+
+        return !string.IsNullOrWhiteSpace(desired);
+    }
     private string FormatSlot(TournamentMatch match, TemplateMatchSlot slot)
     {
         int? userId = slot == TemplateMatchSlot.A ? match.SlotAUserId : match.SlotBUserId;

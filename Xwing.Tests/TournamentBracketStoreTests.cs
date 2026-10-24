@@ -334,7 +334,7 @@ public sealed class TournamentBracketStoreTests
             var update = new TournamentMatchResultUpdate(
                 TournamentMatchStatus.InProgress,
                 TournamentMatchPlayMode.Online,
-                "https://example.com/replay",
+                "my-replay_01",
                 player.Value.UserId,
                 null,
                 3,
@@ -349,6 +349,184 @@ public sealed class TournamentBracketStoreTests
             saved.IsSuccess.ShouldBeTrue();
             saved.Value!.Status.ShouldBe(TournamentMatchStatus.InProgress);
             saved.Value.SlotAPoints.ShouldBe(3);
+            saved.Value.ReplayUrl.ShouldBe("my-replay_01");
         }
+    }
+
+    [Fact]
+    public async Task UpdateMatchResultShouldRejectReplayUrlInsteadOfCode()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            (Tournament tournament, TournamentMatch match) = await CreateTournamentWithSingleMatchAsync(stores);
+            var update = new TournamentMatchResultUpdate(
+                TournamentMatchStatus.NotStarted,
+                TournamentMatchPlayMode.Online,
+                "https://example.com/replay",
+                null,
+                null,
+                null,
+                null,
+                TournamentMatchWinner.None);
+            Result<TournamentMatch> saved = await stores.Brackets.UpdateMatchResultAsync(
+                tournament.TournamentId,
+                match.TournamentMatchId,
+                update,
+                match.RowVersion,
+                TestContext.Current.CancellationToken);
+            saved.IsSuccess.ShouldBeFalse();
+        }
+    }
+
+    [Fact]
+    public async Task UpdateReplayCodeShouldAllowMatchParticipant()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<UserAccount> player = await stores.Users.CreateAsync(
+                "slot-a",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            (Tournament tournament, TournamentMatch match) = await CreateTournamentWithSingleMatchAsync(stores);
+            await stores.Tournaments.JoinAsync(
+                tournament.TournamentId,
+                player.Value!.UserId,
+                TestContext.Current.CancellationToken);
+            var setup = new TournamentMatchResultUpdate(
+                TournamentMatchStatus.InProgress,
+                TournamentMatchPlayMode.Online,
+                null,
+                player.Value.UserId,
+                null,
+                null,
+                null,
+                TournamentMatchWinner.None);
+            Result<TournamentMatch> seeded = await stores.Brackets.UpdateMatchResultAsync(
+                tournament.TournamentId,
+                match.TournamentMatchId,
+                setup,
+                match.RowVersion,
+                TestContext.Current.CancellationToken);
+            seeded.IsSuccess.ShouldBeTrue();
+            Result<TournamentMatch> saved = await stores.Brackets.UpdateReplayCodeAsync(
+                tournament.TournamentId,
+                match.TournamentMatchId,
+                "live-code",
+                player.Value.UserId,
+                actingUserIsAdmin: false,
+                seeded.Value!.RowVersion,
+                TestContext.Current.CancellationToken);
+            saved.IsSuccess.ShouldBeTrue();
+            saved.Value!.ReplayUrl.ShouldBe("live-code");
+        }
+    }
+
+    [Fact]
+    public async Task UpdateReplayCodeShouldRejectNonParticipant()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<UserAccount> slotPlayer = await stores.Users.CreateAsync(
+                "slot-a",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            Result<UserAccount> outsider = await stores.Users.CreateAsync(
+                "outsider",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            (Tournament tournament, TournamentMatch match) = await CreateTournamentWithSingleMatchAsync(stores);
+            await stores.Tournaments.JoinAsync(
+                tournament.TournamentId,
+                slotPlayer.Value!.UserId,
+                TestContext.Current.CancellationToken);
+            var setup = new TournamentMatchResultUpdate(
+                TournamentMatchStatus.InProgress,
+                TournamentMatchPlayMode.Online,
+                null,
+                slotPlayer.Value.UserId,
+                null,
+                null,
+                null,
+                TournamentMatchWinner.None);
+            Result<TournamentMatch> seeded = await stores.Brackets.UpdateMatchResultAsync(
+                tournament.TournamentId,
+                match.TournamentMatchId,
+                setup,
+                match.RowVersion,
+                TestContext.Current.CancellationToken);
+            seeded.IsSuccess.ShouldBeTrue();
+            Result<TournamentMatch> saved = await stores.Brackets.UpdateReplayCodeAsync(
+                tournament.TournamentId,
+                match.TournamentMatchId,
+                "nope",
+                outsider.Value!.UserId,
+                actingUserIsAdmin: false,
+                seeded.Value!.RowVersion,
+                TestContext.Current.CancellationToken);
+            saved.IsSuccess.ShouldBeFalse();
+        }
+    }
+
+    [Fact]
+    public async Task UpdateReplayCodeShouldAllowAdmin()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<UserAccount> admin = await stores.Users.CreateAsync(
+                "admin",
+                "secret",
+                UserRoles.Admin,
+                TestContext.Current.CancellationToken);
+            (Tournament tournament, TournamentMatch match) = await CreateTournamentWithSingleMatchAsync(stores);
+            Result<TournamentMatch> saved = await stores.Brackets.UpdateReplayCodeAsync(
+                tournament.TournamentId,
+                match.TournamentMatchId,
+                "admin-set",
+                admin.Value!.UserId,
+                actingUserIsAdmin: true,
+                match.RowVersion,
+                TestContext.Current.CancellationToken);
+            saved.IsSuccess.ShouldBeTrue();
+            saved.Value!.ReplayUrl.ShouldBe("admin-set");
+        }
+    }
+
+    private static async Task<(Tournament Tournament, TournamentMatch Match)> CreateTournamentWithSingleMatchAsync(
+        TestStores stores)
+    {
+        Result<TournamentTemplate> template = await stores.Templates.CreateAsync(
+            "Bracket",
+            TestContext.Current.CancellationToken);
+        await stores.Templates.AddMatchAsync(
+            template.Value!.TournamentTemplateId,
+            TestContext.Current.CancellationToken);
+        Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+            "Event",
+            DefaultStart,
+            DefaultEnd,
+            TestContext.Current.CancellationToken);
+        await stores.Brackets.AssignTemplateAsync(
+            tournament.Value!.TournamentId,
+            template.Value.TournamentTemplateId,
+            TestContext.Current.CancellationToken);
+        Result<TournamentBracketGraph> graph = await stores.Brackets.GetGraphAsync(
+            tournament.Value.TournamentId,
+            TestContext.Current.CancellationToken);
+        return (tournament.Value, graph.Value!.Matches.Single());
     }
 }

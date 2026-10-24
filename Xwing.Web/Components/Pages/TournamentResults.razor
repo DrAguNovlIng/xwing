@@ -2,6 +2,7 @@
 
 @attribute [Authorize]
 
+@using System.Security.Claims
 @using Xwing.Web.Data
 @using Xwing.Web.Models
 @using Xwing.Web.Stores
@@ -96,13 +97,40 @@
                             <MudChip T="string" Size="Size.Small" Color="Color.Info">Online</MudChip>
                         }
                     </div>
-                    @if (!string.IsNullOrEmpty(match.ReplayUrl))
+                    @{
+                        string? replayWatchUrl = FourGgReplay.ToWatchUrl(match.ReplayUrl);
+                        string? replayDisplayCode = FourGgReplay.GetCodeForDisplay(match.ReplayUrl);
+                    }
+                    @if (replayWatchUrl is not null)
                     {
                         <div class="template-match-box-meta">
-                            <MudLink Href="@match.ReplayUrl"
+                            <MudLink Href="@replayWatchUrl"
                                      Target="_blank"
                                      Typo="Typo.caption"
-                                     Class="template-match-box-meta-link">@GetReplayLinkLabel(match)</MudLink>
+                                     Class="template-match-box-meta-link">Replay</MudLink>
+                        </div>
+                    }
+                    @if (match.Status == TournamentMatchStatus.InProgress
+                         && !string.IsNullOrEmpty(replayDisplayCode)
+                         && !CanEditReplayCode(match))
+                    {
+                        <div class="template-match-box-replay-code">
+                            <MudText Typo="Typo.caption">Match code</MudText>
+                            <span class="template-match-box-replay-code-value" title="Select to copy">@replayDisplayCode</span>
+                        </div>
+                    }
+                    @if (CanEditReplayCode(match))
+                    {
+                        <div class="template-match-box-replay-edit" @onfocusin:stopPropagation="true">
+                            <MudTextField T="string"
+                                          Value="@GetReplayCodeEditValue(match)"
+                                          ValueChanged="@(value => SetReplayCodeEditValue(match.TournamentMatchId, value))"
+                                          Label="Replay code"
+                                          Margin="Margin.Dense"
+                                          Variant="Variant.Text"
+                                          Class="template-match-box-replay-field"
+                                          Immediate="true"
+                                          OnBlur="@(_ => SaveReplayCodeAsync(match))" />
                         </div>
                     }
                     <MudText Typo="Typo.caption" Class="@GetSlotLineClass(match, TemplateMatchSlot.A)">A: @FormatSlot(match, TemplateMatchSlot.A)</MudText>
@@ -112,6 +140,10 @@
         </div>
         </BracketRoundCanvas>
         </div>
+        }
+        @if (!string.IsNullOrEmpty(replayStatusMessage))
+        {
+            <MudAlert Severity="@replayStatusSeverity" Class="mt-2" Dense="true">@replayStatusMessage</MudAlert>
         }
         @if (!string.IsNullOrEmpty(graph.Tournament.FormatDescription))
         {
@@ -135,7 +167,11 @@
     private string pageTitle = "Results";
     private bool loading = true;
     private bool isAdmin;
+    private int? currentUserId;
     private bool liveUpdatesEnabled;
+    private string? replayStatusMessage;
+    private Severity replayStatusSeverity = Severity.Info;
+    private readonly Dictionary<int, string?> replayCodeEdits = new();
     private PeriodicTimer? liveUpdateTimer;
     private CancellationTokenSource? liveUpdateCts;
     protected override async Task OnParametersSetAsync()
@@ -144,6 +180,7 @@
         loading = true;
         AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         isAdmin = authState.User.IsInRole(UserRoles.Admin);
+        currentUserId = TryGetUserId(authState.User);
         await LoadGraphAsync(showLoading: false).ConfigureAwait(false);
         loading = false;
         if (liveUpdatesEnabled)
@@ -249,8 +286,105 @@
         $"left: {cellX * CellSize + BoxOffset}px; top: {cellY * CellSize + BoxOffset}px;";
     private static string DisplayName(TournamentMatch match) =>
         string.IsNullOrWhiteSpace(match.Name) ? $"Match {match.TournamentMatchId}" : match.Name!;
-    private static string GetReplayLinkLabel(TournamentMatch match) =>
-        match.Status == TournamentMatchStatus.Finished ? "Replay" : "Match";
+    private static int? TryGetUserId(ClaimsPrincipal user)
+    {
+        string? idValue = user.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (int.TryParse(idValue, out int userId))
+        {
+            return userId;
+        }
+
+        return null;
+    }
+
+    private bool CanEditReplayCode(TournamentMatch match)
+    {
+        if (isAdmin)
+        {
+            return true;
+        }
+
+        if (currentUserId is not int userId)
+        {
+            return false;
+        }
+
+        return match.SlotAUserId == userId || match.SlotBUserId == userId;
+    }
+
+    private string? GetReplayCodeEditValue(TournamentMatch match)
+    {
+        if (replayCodeEdits.TryGetValue(match.TournamentMatchId, out string? edited))
+        {
+            return edited;
+        }
+
+        return FourGgReplay.GetCodeForDisplay(match.ReplayUrl) ?? string.Empty;
+    }
+
+    private void SetReplayCodeEditValue(int matchId, string? value) =>
+        replayCodeEdits[matchId] = value;
+
+    private async Task SaveReplayCodeAsync(TournamentMatch match)
+    {
+        string? input = replayCodeEdits.TryGetValue(match.TournamentMatchId, out string? edited)
+            ? edited
+            : FourGgReplay.GetCodeForDisplay(match.ReplayUrl);
+
+        if (!ReplayFieldChanged(match, input))
+        {
+            replayCodeEdits.Remove(match.TournamentMatchId);
+            return;
+        }
+
+        if (currentUserId is not int actingUserId)
+        {
+            ShowReplayStatus("Sign in to save a replay code.", Severity.Warning);
+            return;
+        }
+
+        match = graph?.Matches.FirstOrDefault(m => m.TournamentMatchId == match.TournamentMatchId) ?? match;
+        Result<TournamentMatch> result = await BracketStore.UpdateReplayCodeAsync(
+            TournamentId,
+            match.TournamentMatchId,
+            input,
+            actingUserId,
+            isAdmin,
+            match.RowVersion,
+            CancellationToken.None).ConfigureAwait(false);
+        if (!result.IsSuccess)
+        {
+            ShowReplayStatus(result.Error ?? "Could not save replay code.", Severity.Error);
+            return;
+        }
+
+        replayCodeEdits.Remove(match.TournamentMatchId);
+        replayStatusMessage = null;
+        await LoadGraphAsync(showLoading: false).ConfigureAwait(false);
+    }
+
+    private static bool ReplayFieldChanged(TournamentMatch match, string? editReplayCode)
+    {
+        FourGgReplay.ValidateAndNormalize(editReplayCode, out string? desired);
+        string? currentCode = FourGgReplay.GetCodeForDisplay(match.ReplayUrl);
+        if (currentCode is not null)
+        {
+            return !string.Equals(currentCode, desired ?? string.Empty, StringComparison.Ordinal);
+        }
+
+        if (!string.IsNullOrWhiteSpace(match.ReplayUrl))
+        {
+            return !string.IsNullOrWhiteSpace(desired);
+        }
+
+        return !string.IsNullOrWhiteSpace(desired);
+    }
+
+    private void ShowReplayStatus(string message, Severity severity)
+    {
+        replayStatusMessage = message;
+        replayStatusSeverity = severity;
+    }
     private static string GetMatchStatusClass(TournamentMatch match) =>
         match.Status switch
         {
