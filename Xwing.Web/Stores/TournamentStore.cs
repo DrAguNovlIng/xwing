@@ -31,6 +31,7 @@ public sealed class TournamentStore : ITournamentStore
         string name,
         DateTimeOffset startDateUtc,
         DateTimeOffset endDateUtc,
+        bool uniqueFactions,
         CancellationToken cancellationToken)
     {
         Result? validation = ValidateTournamentInput(name, startDateUtc, endDateUtc);
@@ -46,6 +47,7 @@ public sealed class TournamentStore : ITournamentStore
             EndDateUtc = NormalizeToUtcDate(endDateUtc),
             GraphWidthCells = BracketGraphLayout.DefaultGraphWidthCells,
             GraphHeightCells = BracketGraphLayout.DefaultGraphHeightCells,
+            UniqueFactions = uniqueFactions,
         };
         context.Tournaments.Add(tournament);
         Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
@@ -106,6 +108,7 @@ public sealed class TournamentStore : ITournamentStore
         string name,
         DateTimeOffset startDateUtc,
         DateTimeOffset endDateUtc,
+        bool uniqueFactions,
         byte[] rowVersion,
         CancellationToken cancellationToken)
     {
@@ -122,9 +125,23 @@ public sealed class TournamentStore : ITournamentStore
         {
             return Result.Fail<Tournament>("Tournament not found.");
         }
+
+        if (uniqueFactions && !tournament.UniqueFactions)
+        {
+            Result? enableValidation = await ValidateCanEnableUniqueFactionsAsync(
+                context,
+                tournamentId,
+                cancellationToken).ConfigureAwait(false);
+            if (enableValidation is not null)
+            {
+                return Result.Fail<Tournament>(enableValidation.Error!);
+            }
+        }
+
         tournament.Name = name.Trim();
         tournament.StartDateUtc = NormalizeToUtcDate(startDateUtc);
         tournament.EndDateUtc = NormalizeToUtcDate(endDateUtc);
+        tournament.UniqueFactions = uniqueFactions;
         context.Entry(tournament).Property(t => t.RowVersion).OriginalValue = rowVersion;
         Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
         if (!saveResult.IsSuccess)
@@ -150,9 +167,19 @@ public sealed class TournamentStore : ITournamentStore
 
     public async Task<IReadOnlyList<TournamentMember>> ListMembersAsync(
         int tournamentId,
+        int? viewingUserId,
         CancellationToken cancellationToken)
     {
         await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        Tournament? tournament = await context.Tournaments
+            .AsNoTracking()
+            .SingleOrDefaultAsync(t => t.TournamentId == tournamentId, cancellationToken)
+            .ConfigureAwait(false);
+        if (tournament is null)
+        {
+            return [];
+        }
+
         List<TournamentParticipant> participants = await context.TournamentParticipants
             .AsNoTracking()
             .Include(p => p.User)
@@ -160,7 +187,10 @@ public sealed class TournamentStore : ITournamentStore
             .OrderBy(p => p.User.UserName)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
-        return participants.Select(MapMember).ToList();
+        DateTimeOffset todayUtc = TournamentSchedule.TodayUtc(timeProvider);
+        return participants
+            .Select(p => MapMember(p, tournament, viewingUserId, todayUtc))
+            .ToList();
     }
 
     public async Task<Result> SetSquadAsync(
@@ -198,6 +228,19 @@ public sealed class TournamentStore : ITournamentStore
             return Result.Fail("You are not in this tournament.");
         }
         XwaSquad squad = parsed.Value!;
+        if (tournament.UniqueFactions)
+        {
+            if (string.IsNullOrEmpty(participant.SquadFaction))
+            {
+                return Result.Fail("Choose a faction when you join this tournament.");
+            }
+
+            if (!string.Equals(participant.SquadFaction, squad.FactionDisplayName, StringComparison.Ordinal))
+            {
+                return Result.Fail($"Your squad must use {participant.SquadFaction}.");
+            }
+        }
+
         participant.SquadFaction = squad.FactionDisplayName;
         var shipEntries = squad.Pilots
             .Select(p => new SquadShipJsonEntry { Ship = p.ShipId, Pilot = p.PilotId })
@@ -207,19 +250,63 @@ public sealed class TournamentStore : ITournamentStore
         return await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
     }
 
-    private static TournamentMember MapMember(TournamentParticipant participant)
+    internal static TournamentMember MapMember(
+        TournamentParticipant participant,
+        Tournament tournament,
+        int? viewingUserId,
+        DateTimeOffset todayUtc)
     {
         IReadOnlyList<SquadShipDisplay> ships = ParseSquadShipsJson(participant.SquadShipsJson);
-        bool hasSquad = !string.IsNullOrEmpty(participant.SquadFaction) &&
-                        ships.Count > 0 &&
-                        !string.IsNullOrEmpty(participant.SquadUrl);
+        bool hasFullSquad = !string.IsNullOrEmpty(participant.SquadFaction) &&
+                            ships.Count > 0 &&
+                            !string.IsNullOrEmpty(participant.SquadUrl);
+        bool hasFactionClaim = !string.IsNullOrEmpty(participant.SquadFaction);
+        bool isSelf = viewingUserId == participant.UserId;
+        bool rosterLocked = TournamentSchedule.GetStatus(tournament, todayUtc) != TournamentLifecycleStatus.Upcoming;
+
+        if (isSelf)
+        {
+            return new TournamentMember
+            {
+                UserId = participant.UserId,
+                UserName = participant.User.UserName,
+                SquadFactionDisplay = hasFactionClaim ? participant.SquadFaction : null,
+                SquadShips = hasFullSquad ? ships : [],
+                SquadUrl = hasFullSquad ? participant.SquadUrl : null,
+            };
+        }
+
+        if (rosterLocked)
+        {
+            return new TournamentMember
+            {
+                UserId = participant.UserId,
+                UserName = participant.User.UserName,
+                SquadFactionDisplay = hasFactionClaim ? participant.SquadFaction : null,
+                SquadShips = hasFullSquad ? ships : [],
+                SquadUrl = hasFullSquad ? participant.SquadUrl : null,
+            };
+        }
+
+        if (tournament.UniqueFactions && hasFactionClaim)
+        {
+            return new TournamentMember
+            {
+                UserId = participant.UserId,
+                UserName = participant.User.UserName,
+                SquadFactionDisplay = participant.SquadFaction,
+                SquadShips = [],
+                SquadUrl = null,
+            };
+        }
+
         return new TournamentMember
         {
             UserId = participant.UserId,
             UserName = participant.User.UserName,
-            SquadFactionDisplay = hasSquad ? participant.SquadFaction : null,
-            SquadShips = hasSquad ? ships : [],
-            SquadUrl = hasSquad ? participant.SquadUrl : null,
+            SquadFactionDisplay = null,
+            SquadShips = [],
+            SquadUrl = null,
         };
     }
 
@@ -298,7 +385,11 @@ public sealed class TournamentStore : ITournamentStore
         }
     }
 
-    public async Task<Result> JoinAsync(int tournamentId, int userId, CancellationToken cancellationToken)
+    public async Task<Result> JoinAsync(
+        int tournamentId,
+        int userId,
+        string? factionDisplayName,
+        CancellationToken cancellationToken)
     {
         await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         Tournament? tournament = await context.Tournaments
@@ -335,10 +426,44 @@ public sealed class TournamentStore : ITournamentStore
         {
             return Result.Fail("You are already in this tournament.");
         }
+
+        string? storedFaction = null;
+        if (tournament.UniqueFactions)
+        {
+            if (string.IsNullOrWhiteSpace(factionDisplayName))
+            {
+                return Result.Fail("Choose a faction to join this tournament.");
+            }
+
+            string trimmedFaction = factionDisplayName.Trim();
+            if (!XwaFactionCatalog.IsKnownDisplayName(trimmedFaction))
+            {
+                return Result.Fail("Choose a valid faction.");
+            }
+
+            bool factionTaken = await context.TournamentParticipants
+                .AsNoTracking()
+                .AnyAsync(
+                    p => p.TournamentId == tournamentId && p.SquadFaction == trimmedFaction,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (factionTaken)
+            {
+                return Result.Fail("That faction is already taken.");
+            }
+
+            storedFaction = trimmedFaction;
+        }
+        else if (!string.IsNullOrWhiteSpace(factionDisplayName))
+        {
+            return Result.Fail("This tournament does not use unique factions.");
+        }
+
         context.TournamentParticipants.Add(new TournamentParticipant
         {
             TournamentId = tournamentId,
             UserId = userId,
+            SquadFaction = storedFaction,
         });
         return await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
     }
@@ -370,6 +495,38 @@ public sealed class TournamentStore : ITournamentStore
         }
         context.TournamentParticipants.Remove(participant);
         return await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<Result?> ValidateCanEnableUniqueFactionsAsync(
+        XwingDbContext context,
+        int tournamentId,
+        CancellationToken cancellationToken)
+    {
+        List<TournamentParticipant> participants = await context.TournamentParticipants
+            .AsNoTracking()
+            .Where(p => p.TournamentId == tournamentId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (participants.Count == 0)
+        {
+            return null;
+        }
+
+        if (participants.Any(p => string.IsNullOrEmpty(p.SquadFaction)))
+        {
+            return Result.Fail("Every participant must have a faction before unique factions can be enabled.");
+        }
+
+        int distinctFactions = participants
+            .Select(p => p.SquadFaction!)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+        if (distinctFactions != participants.Count)
+        {
+            return Result.Fail("Each participant must have a different faction before unique factions can be enabled.");
+        }
+
+        return null;
     }
 
     private Result? ValidateRosterOpen(Tournament tournament)

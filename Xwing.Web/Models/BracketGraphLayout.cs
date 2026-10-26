@@ -6,7 +6,7 @@ public static class BracketGraphLayout
     public const int BoxWidth = 168;
     public const int BoxHeight = 88;
     public const int DefaultGraphWidthCells = 30;
-    public const int DefaultGraphHeightCells = 30;
+    public const int DefaultGraphHeightCells = 10;
     public const int MinGraphCells = 5;
     public const int MaxGraphCells = 500;
     public static int ToSurfacePixels(int graphCells) => graphCells * CellSize;

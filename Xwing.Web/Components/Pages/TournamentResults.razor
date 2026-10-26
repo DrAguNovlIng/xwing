@@ -172,12 +172,12 @@
     private CancellationTokenSource? liveUpdateCts;
     protected override async Task OnParametersSetAsync()
     {
-        await StopLiveUpdatesAsync().ConfigureAwait(false);
+        await StopLiveUpdatesAsync();
         loading = true;
         AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         isAdmin = authState.User.IsInRole(UserRoles.Admin);
         currentUserId = TryGetUserId(authState.User);
-        await LoadGraphAsync(showLoading: false).ConfigureAwait(false);
+        await LoadGraphAsync(showLoading: false);
         loading = false;
         if (liveUpdatesEnabled)
         {
@@ -197,12 +197,12 @@
         liveUpdatesEnabled = enabled;
         if (enabled)
         {
-            await LoadGraphAsync(showLoading: false).ConfigureAwait(false);
+            await LoadGraphAsync(showLoading: false);
             StartLiveUpdates();
             return;
         }
 
-        await StopLiveUpdatesAsync().ConfigureAwait(false);
+        await StopLiveUpdatesAsync();
     }
 
     private async Task LoadGraphAsync(bool showLoading)
@@ -213,7 +213,7 @@
         }
 
         Result<TournamentBracketGraph> result = await BracketStore.GetGraphAsync(TournamentId, CancellationToken.None)
-            .ConfigureAwait(false);
+;
         graph = result.IsSuccess ? result.Value : null;
         pageTitle = graph is null ? "Results" : $"{graph.Tournament.Name} — Results";
         if (showLoading)
@@ -242,7 +242,7 @@
     {
         if (liveUpdateCts is not null)
         {
-            await liveUpdateCts.CancelAsync().ConfigureAwait(false);
+            await liveUpdateCts.CancelAsync();
             liveUpdateCts.Dispose();
             liveUpdateCts = null;
         }
@@ -256,13 +256,13 @@
         try
         {
             while (liveUpdateTimer is not null &&
-                   await liveUpdateTimer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+                   await liveUpdateTimer.WaitForNextTickAsync(cancellationToken))
             {
                 await InvokeAsync(async () =>
                 {
-                    await LoadGraphAsync(showLoading: false).ConfigureAwait(false);
+                    await LoadGraphAsync(showLoading: false);
                     StateHasChanged();
-                }).ConfigureAwait(false);
+                });
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -365,7 +365,7 @@
             actingUserId,
             isAdmin,
             match.RowVersion,
-            CancellationToken.None).ConfigureAwait(false);
+            CancellationToken.None);
         if (!result.IsSuccess)
         {
             ShowReplayStatus(result.Error ?? "Could not save replay code.", Severity.Error);
@@ -374,7 +374,7 @@
 
         replayCodeEdits.Remove(match.TournamentMatchId);
         replayStatusMessage = null;
-        await LoadGraphAsync(showLoading: false).ConfigureAwait(false);
+        await LoadGraphAsync(showLoading: false);
     }
 
     private static bool ReplayFieldChanged(TournamentMatch match, string? editReplayCode)

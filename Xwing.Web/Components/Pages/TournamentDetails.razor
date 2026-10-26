@@ -52,6 +52,10 @@ else
     <div class="tournament-details-summary mb-4">
         <div class="tournament-details-facts">
             <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(tournament)">@GetStatusLabel(tournament)</MudChip>
+            @if (tournament.UniqueFactions)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Secondary">Unique factions</MudChip>
+            }
             @if (currentUserJoined && CurrentUserHasSquad)
             {
                 <MudChip T="string" Size="Size.Small" Color="Color.Success">Squad added</MudChip>
@@ -144,6 +148,9 @@ else
                             }
                             <MudText Typo="Typo.body2" Class="squad-faction-name">@member.SquadFactionDisplay</MudText>
                         </div>
+                    }
+                    @if (member.SquadShips.Count > 0)
+                    {
                         <div class="squad-pilot-rows">
                             @foreach (SquadShipDisplay ship in member.SquadShips)
                             {
@@ -183,18 +190,21 @@ else
     private CancellationTokenSource? countdownCts;
     protected override async Task OnParametersSetAsync()
     {
-        await StopCountdownAsync().ConfigureAwait(false);
+        await StopCountdownAsync();
         loading = true;
         statusMessage = null;
         todayUtc = TournamentSchedule.TodayUtc(TimeProvider);
-        AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync().ConfigureAwait(false);
+        AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         string? idClaim = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
         currentUserId = int.TryParse(idClaim, CultureInfo.InvariantCulture, out int parsedId) ? parsedId : null;
         isAdmin = authState.User.IsInRole(UserRoles.Admin);
-        tournament = await TournamentStore.GetAsync(TournamentId, CancellationToken.None).ConfigureAwait(false);
+        tournament = await TournamentStore.GetAsync(TournamentId, CancellationToken.None);
         if (tournament is not null)
         {
-            members = await TournamentStore.ListMembersAsync(TournamentId, CancellationToken.None).ConfigureAwait(false);
+            members = await TournamentStore.ListMembersAsync(
+                TournamentId,
+                currentUserId,
+                CancellationToken.None);
             RefreshRosterState();
             currentUserJoined = currentUserId is int uid && members.Any(m => m.UserId == uid);
         }
@@ -254,7 +264,7 @@ else
     {
         if (countdownCts is not null)
         {
-            await countdownCts.CancelAsync().ConfigureAwait(false);
+            await countdownCts.CancelAsync();
             countdownCts.Dispose();
             countdownCts = null;
         }
@@ -266,17 +276,17 @@ else
     {
         try
         {
-            while (countdownTimer is not null && await countdownTimer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            while (countdownTimer is not null && await countdownTimer.WaitForNextTickAsync(cancellationToken))
             {
                 await InvokeAsync(() =>
                 {
                     RefreshRosterState();
                     StateHasChanged();
-                }).ConfigureAwait(false);
+                });
                 if (!rosterOpen || tournament is null ||
                     !TournamentSchedule.TimeLeftToJoinUsesMinuteRefresh(tournament, TimeProvider.GetUtcNow()))
                 {
-                    await StopCountdownAsync().ConfigureAwait(false);
+                    await StopCountdownAsync();
                 }
             }
         }
@@ -304,11 +314,11 @@ else
         IDialogReference dialog = await DialogService.ShowAsync<TournamentSquadDialog>(
             string.Empty,
             parameters,
-            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true }).ConfigureAwait(false);
-        DialogResult? result = await dialog.Result.ConfigureAwait(false);
+            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true });
+        DialogResult? result = await dialog.Result;
         if (result is not null && !result.Canceled)
         {
-            await ReloadMembersAsync().ConfigureAwait(false);
+            await ReloadMembersAsync();
             ShowStatus("Squad saved.", Severity.Success);
         }
     }
@@ -317,31 +327,67 @@ else
     {
         IDialogReference dialog = await DialogService.ShowAsync<LeaveTournamentConfirmDialog>(
             string.Empty,
-            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true }).ConfigureAwait(false);
-        DialogResult? result = await dialog.Result.ConfigureAwait(false);
+            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true });
+        DialogResult? result = await dialog.Result;
         if (result is not null && !result.Canceled && result.Data is true)
         {
-            await LeaveAsync().ConfigureAwait(false);
+            await LeaveAsync();
         }
     }
 
     private async Task JoinAsync()
     {
-        if (currentUserId is not int userId)
+        if (currentUserId is not int userId || tournament is null)
         {
             return;
         }
+
+        if (tournament.UniqueFactions)
+        {
+            await OpenJoinFactionDialogAsync(userId);
+            return;
+        }
+
         actionInProgress = true;
         statusMessage = null;
-        Result result = await TournamentStore.JoinAsync(TournamentId, userId, CancellationToken.None).ConfigureAwait(false);
+        Result result = await TournamentStore.JoinAsync(
+            TournamentId,
+            userId,
+            factionDisplayName: null,
+            CancellationToken.None);
         actionInProgress = false;
         if (!result.IsSuccess)
         {
             ShowStatus(result.Error!, Severity.Error);
             return;
         }
-        await ReloadMembersAsync().ConfigureAwait(false);
+
+        await ReloadMembersAsync();
         ShowStatus("You joined the tournament.", Severity.Success);
+    }
+
+    private async Task OpenJoinFactionDialogAsync(int userId)
+    {
+        IReadOnlyList<string> takenFactions = members
+            .Where(m => !string.IsNullOrEmpty(m.SquadFactionDisplay))
+            .Select(m => m.SquadFactionDisplay!)
+            .ToList();
+        var parameters = new DialogParameters<TournamentJoinFactionDialog>
+        {
+            { x => x.TournamentId, TournamentId },
+            { x => x.UserId, userId },
+            { x => x.TakenFactions, takenFactions },
+        };
+        IDialogReference dialog = await DialogService.ShowAsync<TournamentJoinFactionDialog>(
+            string.Empty,
+            parameters,
+            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true });
+        DialogResult? result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await ReloadMembersAsync();
+            ShowStatus("You joined the tournament.", Severity.Success);
+        }
     }
 
     private async Task LeaveAsync()
@@ -352,20 +398,23 @@ else
         }
         actionInProgress = true;
         statusMessage = null;
-        Result result = await TournamentStore.LeaveAsync(TournamentId, userId, CancellationToken.None).ConfigureAwait(false);
+        Result result = await TournamentStore.LeaveAsync(TournamentId, userId, CancellationToken.None);
         actionInProgress = false;
         if (!result.IsSuccess)
         {
             ShowStatus(result.Error!, Severity.Error);
             return;
         }
-        await ReloadMembersAsync().ConfigureAwait(false);
+        await ReloadMembersAsync();
         ShowStatus("You left the tournament.", Severity.Success);
     }
 
     private async Task ReloadMembersAsync()
     {
-        members = await TournamentStore.ListMembersAsync(TournamentId, CancellationToken.None).ConfigureAwait(false);
+        members = await TournamentStore.ListMembersAsync(
+            TournamentId,
+            currentUserId,
+            CancellationToken.None);
         currentUserJoined = currentUserId is int uid && members.Any(m => m.UserId == uid);
     }
 

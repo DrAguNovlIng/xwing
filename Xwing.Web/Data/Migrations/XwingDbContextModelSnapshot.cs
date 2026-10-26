@@ -174,7 +174,7 @@ namespace Xwing.Web.Data.Migrations
                     b.Property<int>("GraphHeightCells")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
-                        .HasDefaultValue(30);
+                        .HasDefaultValue(10);
 
                     b.Property<int>("GraphWidthCells")
                         .ValueGeneratedOnAdd()
@@ -203,6 +203,11 @@ namespace Xwing.Web.Data.Migrations
 
                     b.Property<int?>("TournamentTemplateId")
                         .HasColumnType("int");
+
+                    b.Property<bool>("UniqueFactions")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.HasKey("TournamentId");
 
@@ -437,7 +442,7 @@ namespace Xwing.Web.Data.Migrations
                     b.Property<int>("GraphHeightCells")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
-                        .HasDefaultValue(30);
+                        .HasDefaultValue(10);
 
                     b.Property<int>("GraphWidthCells")
                         .ValueGeneratedOnAdd()

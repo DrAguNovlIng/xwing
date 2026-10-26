@@ -1,7 +1,10 @@
+@using Microsoft.JSInterop
+@using Xwing.Web.Components
 @using Xwing.Web.Data
 @using Xwing.Web.Models
 @using Xwing.Web.Stores
 @inject IJSRuntime Js
+@inject IDialogService DialogService
 
 <div class="bracket-round-canvas-stack" style="width: @(SurfaceWidth)px">
     @if (columnBands.Count > 0)
@@ -12,27 +15,40 @@
                 int columnIndex = i;
                 BracketRoundBandView band = columnBands[i];
                 int headerWidthPx = band.WidthCells * BracketGraphLayout.CellSize;
-                <div class="bracket-round-header-cell" style="width: @(headerWidthPx)px">
+                <div class="bracket-round-header-cell" style="width: @(headerWidthPx)px; max-width: @(headerWidthPx)px;">
                     <MudText Typo="Typo.caption" Class="bracket-round-header-label">Round @(columnIndex + 1)</MudText>
                     @if (Editable)
                     {
-                        <MudSelect T="XwaScenario?"
-                                   Value="band.Scenario"
-                                   ValueChanged="value => OnScenarioChangedAsync(columnIndex, value)"
-                                   Variant="Variant.Outlined"
-                                   Margin="Margin.Dense"
-                                   Dense="true"
-                                   Class="bracket-round-scenario-select">
-                            <MudSelectItem T="XwaScenario?" Value="@((XwaScenario?)null)">—</MudSelectItem>
-                            @foreach (XwaScenario scenario in XwaScenarios.All)
-                            {
-                                <MudSelectItem T="XwaScenario?" Value="@scenario">@XwaScenarios.GetDisplayLabel(scenario)</MudSelectItem>
-                            }
-                        </MudSelect>
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                       Size="Size.Small"
-                                       aria-label="Remove round column"
-                                       OnClick="@(() => RemoveColumnAsync(columnIndex))" />
+                        <div class="bracket-round-scenario-row"
+                             title="@XwaScenarios.GetDisplayLabel(band.Scenario)">
+                            <MudSelect T="XwaScenario?"
+                                       Value="band.Scenario"
+                                       ValueChanged="value => OnScenarioChangedAsync(columnIndex, value)"
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
+                                       Dense="true"
+                                       FullWidth="true"
+                                       FitContent="false"
+                                       RelativeWidth="DropdownWidth.Relative"
+                                       InputClass="bracket-round-scenario-select-input"
+                                       Class="bracket-round-scenario-select">
+                                <MudSelectItem T="XwaScenario?" Value="@((XwaScenario?)null)">—</MudSelectItem>
+                                @foreach (XwaScenario scenario in XwaScenarios.All)
+                                {
+                                    <MudSelectItem T="XwaScenario?" Value="@scenario">@XwaScenarios.GetDisplayLabel(scenario)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </div>
+                        <div class="bracket-round-header-actions">
+                            <MudIconButton Icon="@Icons.Material.Filled.Shuffle"
+                                           Size="Size.Small"
+                                           aria-label="Random scenario"
+                                           OnClick="@(() => OpenRandomScenarioDialogAsync(columnIndex))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Size="Size.Small"
+                                           aria-label="Remove round column"
+                                           OnClick="@(() => RemoveColumnAsync(columnIndex))" />
+                        </div>
                     }
                     else if (band.Scenario is not null)
                     {
@@ -57,7 +73,7 @@
                 int capturedBoundary = boundaryIndex;
                 int linePx = BracketRoundLayout.GetBoundaryCellX(capturedBoundary, widths) * BracketGraphLayout.CellSize;
                 <div class="bracket-round-boundary-line" style="left: @(linePx)px"></div>
-                @if (Editable)
+                @if (Editable && AllowColumnResize)
                 {
                     <div class="bracket-round-boundary-handle"
                          style="left: @(linePx - 6)px"
@@ -68,16 +84,6 @@
             }
         }
     </div>
-    @if (Editable)
-    {
-        <MudButton Variant="Variant.Outlined"
-                   Size="Size.Small"
-                   StartIcon="@Icons.Material.Filled.ViewColumn"
-                   Class="mt-2"
-                   OnClick="AddRoundAsync">
-            Add round
-        </MudButton>
-    }
 </div>
 
 @code {
@@ -92,6 +98,9 @@
 
     [Parameter]
     public bool Editable { get; set; }
+
+    [Parameter]
+    public bool AllowColumnResize { get; set; } = true;
 
     [Parameter]
     public IReadOnlyList<BracketRoundBandView> Bands { get; set; } = [];
@@ -110,6 +119,12 @@
 
     protected override void OnParametersSet()
     {
+        if (!AllowColumnResize)
+        {
+            draggingBoundaryIndex = null;
+            dragStartWidths = null;
+        }
+
         if (draggingBoundaryIndex is not null)
         {
             return;
@@ -118,7 +133,7 @@
         columnBands = Bands.Select(b => new BracketRoundBandView(b.WidthCells, b.Scenario)).ToList();
     }
 
-    private async Task AddRoundAsync()
+    public async Task AddRoundAsync()
     {
         List<int> widths = columnBands.Select(b => b.WidthCells).ToList();
         List<XwaScenario?> scenarios = columnBands.Select(b => b.Scenario).ToList();
@@ -146,7 +161,7 @@
             scenarios.Add(null);
         }
 
-        await SaveBandsAsync(widths, scenarios).ConfigureAwait(false);
+        await SaveBandsAsync(widths, scenarios);
     }
 
     private async Task RemoveColumnAsync(int columnIndex)
@@ -161,12 +176,12 @@
         List<XwaScenario?> scenarios = columnBands.Select(b => b.Scenario).ToList();
         if (layoutResult.Value!.Count == 0)
         {
-            await SaveBandsAsync([], []).ConfigureAwait(false);
+            await SaveBandsAsync([], []);
             return;
         }
 
         scenarios.RemoveAt(columnIndex);
-        await SaveBandsAsync(layoutResult.Value, scenarios).ConfigureAwait(false);
+        await SaveBandsAsync(layoutResult.Value, scenarios);
     }
 
     private async Task OnScenarioChangedAsync(int columnIndex, XwaScenario? scenario)
@@ -174,7 +189,36 @@
         List<int> widths = columnBands.Select(b => b.WidthCells).ToList();
         List<XwaScenario?> scenarios = columnBands.Select(b => b.Scenario).ToList();
         scenarios[columnIndex] = scenario;
-        await SaveBandsAsync(widths, scenarios).ConfigureAwait(false);
+        await SaveBandsAsync(widths, scenarios);
+    }
+
+    private static readonly DialogOptions randomScenarioDialogOptions = new()
+    {
+        CloseButton = true,
+        FullWidth = true,
+        MaxWidth = MaxWidth.Small,
+    };
+
+    private async Task OpenRandomScenarioDialogAsync(int columnIndex)
+    {
+        IReadOnlyList<XwaScenario?> roundScenarios = columnBands.Select(b => b.Scenario).ToList();
+        int targetRoundNumber = columnIndex + 1;
+        var parameters = new DialogParameters<RandomScenarioDialog>
+        {
+            { x => x.TargetRoundNumber, targetRoundNumber },
+            { x => x.RoundScenarios, roundScenarios },
+        };
+        IDialogReference dialog = await DialogService.ShowAsync<RandomScenarioDialog>(
+            null,
+            parameters,
+            randomScenarioDialogOptions);
+        DialogResult? result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not XwaScenario chosen)
+        {
+            return;
+        }
+
+        await OnScenarioChangedAsync(columnIndex, chosen);
     }
 
     private async Task StartBoundaryDragAsync(PointerEventArgs args, int boundaryIndex)
@@ -187,7 +231,12 @@
         draggingBoundaryIndex = boundaryIndex;
         dragStartClientX = args.ClientX;
         dragStartWidths = columnBands.Select(b => b.WidthCells).ToArray();
-        await Js.InvokeVoidAsync("xwingTheme.capturePointer", surfaceHost, args.PointerId).ConfigureAwait(false);
+        await JsInteropTiming.TryInvokeVoidAsync(
+            Js,
+            RendererInfo.IsInteractive,
+            "xwingTheme.capturePointer",
+            surfaceHost,
+            args.PointerId);
     }
 
     private void OnBoundaryPointerMove(PointerEventArgs args)
@@ -225,7 +274,7 @@
         }
 
         List<XwaScenario?> scenarios = columnBands.Select(b => b.Scenario).ToList();
-        await SaveBandsAsync(current.ToList(), scenarios).ConfigureAwait(false);
+        await SaveBandsAsync(current.ToList(), scenarios);
     }
 
     private async Task SaveBandsAsync(IReadOnlyList<int> widths, IReadOnlyList<XwaScenario?> scenarios)
@@ -241,6 +290,6 @@
             inputs[i] = new CanvasRoundInput(scenarios[i], widths[i]);
         }
 
-        await SaveRoundsRequested.InvokeAsync(inputs).ConfigureAwait(false);
+        await SaveRoundsRequested.InvokeAsync(inputs);
     }
 }

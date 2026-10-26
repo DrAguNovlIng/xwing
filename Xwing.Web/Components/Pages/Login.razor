@@ -52,12 +52,12 @@
     private string returnUrl = "/tournaments";
     protected override async Task OnInitializedAsync()
     {
-        if (!await UserStore.AnyAdminExistsAsync(CancellationToken.None).ConfigureAwait(false))
+        if (!await UserStore.AnyAdminExistsAsync(CancellationToken.None))
         {
             NavigationManager.NavigateTo("/users", forceLoad: true);
             return;
         }
-        AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync().ConfigureAwait(false);
+        AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         if (authState.User.Identity?.IsAuthenticated == true)
         {
             NavigationManager.NavigateTo("/tournaments");

@@ -5,6 +5,10 @@
             <MudTextField @bind-Value="name" Label="Name" Variant="Variant.Outlined" Required="true" />
             <MudDatePicker @bind-Date="startDate" Label="Start date" Variant="Variant.Outlined" Required="true" />
             <MudDatePicker @bind-Date="endDate" Label="End date" Variant="Variant.Outlined" Required="true" />
+            <MudCheckBox @bind-Value="uniqueFactions" Label="Unique factions" Color="Color.Primary" />
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                Players choose a faction when joining. Others see that faction before the tournament starts; squad details unlock when play begins.
+            </MudText>
             @if (!string.IsNullOrEmpty(errorMessage))
             {
                 <MudAlert Severity="Severity.Error" Dense="true">@errorMessage</MudAlert>
@@ -26,12 +30,14 @@
     private string name = string.Empty;
     private DateTime? startDate;
     private DateTime? endDate;
+    private bool uniqueFactions;
     private string? errorMessage;
     protected override void OnParametersSet()
     {
         name = Tournament?.Name ?? string.Empty;
         startDate = Tournament is null ? null : Tournament.StartDateUtc.UtcDateTime.Date;
         endDate = Tournament is null ? null : Tournament.EndDateUtc.UtcDateTime.Date;
+        uniqueFactions = Tournament?.UniqueFactions ?? false;
         errorMessage = null;
     }
 
@@ -51,6 +57,7 @@
                 name,
                 startDateUtc,
                 endDateUtc,
+                uniqueFactions,
                 CancellationToken.None);
             if (!result.IsSuccess)
             {
@@ -65,6 +72,7 @@
             name,
             startDateUtc,
             endDateUtc,
+            uniqueFactions,
             Tournament.RowVersion,
             CancellationToken.None);
         if (!updateResult.IsSuccess)

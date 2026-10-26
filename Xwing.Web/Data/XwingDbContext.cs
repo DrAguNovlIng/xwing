@@ -49,8 +49,9 @@ public sealed class XwingDbContext : DbContext
             entity.Property(e => e.TimeCreatedUtc).HasColumnType("datetimeoffset");
             entity.Property(e => e.TimeUpdatedUtc).HasColumnType("datetimeoffset");
             entity.Property(e => e.GraphWidthCells).HasDefaultValue(30);
-            entity.Property(e => e.GraphHeightCells).HasDefaultValue(30);
+            entity.Property(e => e.GraphHeightCells).HasDefaultValue(10);
             entity.Property(e => e.FormatDescription).HasMaxLength(4000);
+            entity.Property(e => e.UniqueFactions).HasDefaultValue(false);
             entity.HasOne(e => e.TournamentTemplate)
                 .WithMany()
                 .HasForeignKey(e => e.TournamentTemplateId)
@@ -96,7 +97,7 @@ public sealed class XwingDbContext : DbContext
             entity.Property(e => e.TournamentTemplateId).UseIdentityColumn();
             entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
             entity.Property(e => e.GraphWidthCells).HasDefaultValue(30);
-            entity.Property(e => e.GraphHeightCells).HasDefaultValue(30);
+            entity.Property(e => e.GraphHeightCells).HasDefaultValue(10);
             entity.Property(e => e.FormatDescription).HasMaxLength(4000);
             entity.Property(e => e.TimeCreatedUtc).HasColumnType("datetimeoffset");
             entity.Property(e => e.TimeUpdatedUtc).HasColumnType("datetimeoffset");

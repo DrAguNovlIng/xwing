@@ -1,0 +1,93 @@
+@using Xwing.Web.Stores
+@inject ITournamentStore TournamentStore
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Choose your faction</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            Each faction can only be taken once. Your squad must match this faction when you add it.
+        </MudText>
+        <MudStack Spacing="2">
+            @foreach (string faction in XwaFactionCatalog.AllDisplayNames)
+            {
+                bool taken = takenFactions.Contains(faction);
+                string? themeKey = XwaSquad.GetFactionThemeKey(faction);
+                string? iconSlug = XwaSquad.GetFactionIconSlug(faction);
+                <button type="button"
+                        class="faction-picker-option squad-faction-banner @(themeKey is null ? "squad-faction-banner--plain" : null) @(taken ? "faction-picker-option--taken" : null)"
+                        data-faction="@themeKey"
+                        disabled="@(taken || joinInProgress)"
+                        @onclick="@(() => JoinWithFactionAsync(faction))">
+                    @if (iconSlug is not null)
+                    {
+                        <i class="@($"xwing-miniatures-font xwing-miniatures-font-{iconSlug} squad-faction-icon")"
+                           aria-hidden="true"></i>
+                    }
+                    <MudText Typo="Typo.body2" Class="squad-faction-name">@faction</MudText>
+                    @if (taken)
+                    {
+                        <MudText Typo="Typo.caption" Class="faction-picker-taken-label">Taken</MudText>
+                    }
+                </button>
+            }
+        </MudStack>
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@errorMessage</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public int TournamentId { get; set; }
+
+    [Parameter]
+    public int UserId { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<string> TakenFactions { get; set; } = [];
+
+    private HashSet<string> takenFactions = [];
+    private bool joinInProgress;
+    private string? errorMessage;
+
+    protected override void OnParametersSet()
+    {
+        takenFactions = TakenFactions.ToHashSet(StringComparer.Ordinal);
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task JoinWithFactionAsync(string faction)
+    {
+        if (joinInProgress || takenFactions.Contains(faction))
+        {
+            return;
+        }
+
+        joinInProgress = true;
+        errorMessage = null;
+        Result result = await TournamentStore.JoinAsync(
+            TournamentId,
+            UserId,
+            faction,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            joinInProgress = false;
+            errorMessage = result.Error;
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

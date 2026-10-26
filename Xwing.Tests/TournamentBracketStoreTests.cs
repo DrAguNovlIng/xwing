@@ -51,6 +51,7 @@ public sealed class TournamentBracketStoreTests
                 "Event",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             Result assigned = await stores.Brackets.AssignTemplateAsync(
                 tournament.Value!.TournamentId,
@@ -80,6 +81,7 @@ public sealed class TournamentBracketStoreTests
                 "Event",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             CanvasRoundInput[] rounds =
             [
@@ -120,6 +122,7 @@ public sealed class TournamentBracketStoreTests
                 "Event",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             await stores.Brackets.AssignTemplateAsync(
                 tournament.Value!.TournamentId,
@@ -155,6 +158,7 @@ public sealed class TournamentBracketStoreTests
                 "Event",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             const string description = "Single elimination\nBest of 3";
             Result<Tournament> saved = await stores.Brackets.UpdateFormatDescriptionAsync(
@@ -200,6 +204,7 @@ public sealed class TournamentBracketStoreTests
                 "Event",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             Result assigned = await stores.Brackets.AssignTemplateAsync(
                 tournament.Value!.TournamentId,
@@ -235,6 +240,7 @@ public sealed class TournamentBracketStoreTests
                 "Event",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             Result assigned = await stores.Brackets.AssignTemplateAsync(
                 tournament.Value!.TournamentId,
@@ -267,6 +273,7 @@ public sealed class TournamentBracketStoreTests
                 "Event",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             await stores.Brackets.AssignTemplateAsync(
                 tournament.Value!.TournamentId,
@@ -318,10 +325,12 @@ public sealed class TournamentBracketStoreTests
                 "Event",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             await stores.Tournaments.JoinAsync(
                 tournament.Value!.TournamentId,
                 player.Value!.UserId,
+                null,
                 TestContext.Current.CancellationToken);
             await stores.Brackets.AssignTemplateAsync(
                 tournament.Value.TournamentId,
@@ -398,6 +407,7 @@ public sealed class TournamentBracketStoreTests
             await stores.Tournaments.JoinAsync(
                 tournament.TournamentId,
                 player.Value!.UserId,
+                null,
                 TestContext.Current.CancellationToken);
             var setup = new TournamentMatchResultUpdate(
                 TournamentMatchStatus.InProgress,
@@ -450,6 +460,7 @@ public sealed class TournamentBracketStoreTests
             await stores.Tournaments.JoinAsync(
                 tournament.TournamentId,
                 slotPlayer.Value!.UserId,
+                null,
                 TestContext.Current.CancellationToken);
             var setup = new TournamentMatchResultUpdate(
                 TournamentMatchStatus.InProgress,
@@ -551,14 +562,17 @@ public sealed class TournamentBracketStoreTests
                 "Event",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             await stores.Tournaments.JoinAsync(
                 tournament.Value!.TournamentId,
                 playerA.Value!.UserId,
+                null,
                 TestContext.Current.CancellationToken);
             await stores.Tournaments.JoinAsync(
                 tournament.Value.TournamentId,
                 playerB.Value!.UserId,
+                null,
                 TestContext.Current.CancellationToken);
             await stores.Brackets.AssignTemplateAsync(
                 tournament.Value.TournamentId,
@@ -608,6 +622,7 @@ public sealed class TournamentBracketStoreTests
             "Event",
             DefaultStart,
             DefaultEnd,
+            false,
             TestContext.Current.CancellationToken);
         await stores.Brackets.AssignTemplateAsync(
             tournament.Value!.TournamentId,

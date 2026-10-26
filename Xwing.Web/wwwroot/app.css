@@ -203,60 +203,120 @@ h1:focus {
     font-weight: 600;
 }
 
-.squad-faction-banner[data-faction="rebel-alliance"] {
-    background: linear-gradient(90deg, rgba(226, 59, 47, 0.38) 0%, rgba(226, 59, 47, 0.12) 50%, transparent 100%);
+.squad-faction-banner[data-faction] {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+}
+
+.squad-faction-banner[data-faction]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    pointer-events: none;
+}
+
+.squad-faction-banner[data-faction] > * {
+    position: relative;
+    z-index: 1;
+}
+
+.squad-faction-banner[data-faction="rebel-alliance"]::before {
+    background: linear-gradient(90deg, rgba(226, 59, 47, 0.38) 0%, rgba(226, 59, 47, 0.1) 42%, rgba(226, 59, 47, 0) 100%);
 }
 
 .squad-faction-banner[data-faction="rebel-alliance"] .squad-faction-icon {
     color: #E23B2F;
 }
 
-.squad-faction-banner[data-faction="galactic-empire"] {
-    background: linear-gradient(90deg, rgba(31, 122, 58, 0.38) 0%, rgba(31, 122, 58, 0.12) 50%, transparent 100%);
+.squad-faction-banner[data-faction="galactic-empire"]::before {
+    background: linear-gradient(90deg, rgba(31, 122, 58, 0.38) 0%, rgba(31, 122, 58, 0.1) 42%, rgba(31, 122, 58, 0) 100%);
 }
 
 .squad-faction-banner[data-faction="galactic-empire"] .squad-faction-icon {
     color: #1F7A3A;
 }
 
-.squad-faction-banner[data-faction="scum-and-villainy"] {
-    background: linear-gradient(90deg, rgba(230, 163, 23, 0.38) 0%, rgba(230, 163, 23, 0.12) 50%, transparent 100%);
+.squad-faction-banner[data-faction="scum-and-villainy"]::before {
+    background: linear-gradient(90deg, rgba(230, 163, 23, 0.38) 0%, rgba(230, 163, 23, 0.1) 42%, rgba(230, 163, 23, 0) 100%);
 }
 
 .squad-faction-banner[data-faction="scum-and-villainy"] .squad-faction-icon {
     color: #E6A317;
 }
 
-.squad-faction-banner[data-faction="resistance"] {
-    background: linear-gradient(90deg, rgba(241, 90, 34, 0.38) 0%, rgba(241, 90, 34, 0.12) 50%, transparent 100%);
+.squad-faction-banner[data-faction="resistance"]::before {
+    background: linear-gradient(90deg, rgba(241, 90, 34, 0.38) 0%, rgba(241, 90, 34, 0.1) 42%, rgba(241, 90, 34, 0) 100%);
 }
 
 .squad-faction-banner[data-faction="resistance"] .squad-faction-icon {
     color: #F15A22;
 }
 
-.squad-faction-banner[data-faction="first-order"] {
-    background: linear-gradient(90deg, rgba(142, 27, 44, 0.38) 0%, rgba(142, 27, 44, 0.12) 50%, transparent 100%);
+.squad-faction-banner[data-faction="first-order"]::before {
+    background: linear-gradient(90deg, rgba(142, 27, 44, 0.38) 0%, rgba(142, 27, 44, 0.1) 42%, rgba(142, 27, 44, 0) 100%);
 }
 
 .squad-faction-banner[data-faction="first-order"] .squad-faction-icon {
     color: #8E1B2C;
 }
 
-.squad-faction-banner[data-faction="galactic-republic"] {
-    background: linear-gradient(90deg, rgba(196, 163, 90, 0.42) 0%, rgba(196, 163, 90, 0.14) 50%, transparent 100%);
+.squad-faction-banner[data-faction="galactic-republic"]::before {
+    background: linear-gradient(90deg, rgba(196, 163, 90, 0.42) 0%, rgba(196, 163, 90, 0.12) 42%, rgba(196, 163, 90, 0) 100%);
 }
 
 .squad-faction-banner[data-faction="galactic-republic"] .squad-faction-icon {
     color: #C4A35A;
 }
 
-.squad-faction-banner[data-faction="separatist-alliance"] {
-    background: linear-gradient(90deg, rgba(28, 90, 166, 0.38) 0%, rgba(28, 90, 166, 0.12) 50%, transparent 100%);
+.squad-faction-banner[data-faction="separatist-alliance"]::before {
+    background: linear-gradient(90deg, rgba(28, 90, 166, 0.38) 0%, rgba(28, 90, 166, 0.1) 42%, rgba(28, 90, 166, 0) 100%);
 }
 
 .squad-faction-banner[data-faction="separatist-alliance"] .squad-faction-icon {
     color: #1C5AA6;
+}
+
+.faction-picker-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    margin: 0;
+    border: 1px solid var(--mud-palette-lines-default);
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: transparent;
+}
+
+.faction-picker-option.squad-faction-banner {
+    margin-top: 0;
+}
+
+.faction-picker-option .squad-faction-name {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+}
+
+.faction-picker-option:not(:disabled):hover {
+    filter: brightness(1.05);
+}
+
+.faction-picker-option--taken {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.faction-picker-taken-label {
+    margin-left: auto;
+    opacity: 0.85;
 }
 
 .squad-pilot-rows {
@@ -326,19 +386,64 @@ h1:focus {
     flex-direction: column;
     gap: 4px;
     min-width: 0;
+    overflow: hidden;
 }
 
 .bracket-round-header-cell:last-child {
     border-right: none;
 }
 
-.bracket-round-scenario-select {
+.bracket-round-scenario-row {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.bracket-round-scenario-row .bracket-round-scenario-select {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+}
+
+.bracket-round-header-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0;
+}
+
+.mud-select.bracket-round-scenario-select {
     font-size: 0.75rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.mud-select.bracket-round-scenario-select .mud-input-control {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.mud-select.bracket-round-scenario-select .mud-input-control-input-container {
+    max-width: 100%;
+    min-width: 0;
+}
+
+.mud-select.bracket-round-scenario-select input.bracket-round-scenario-select-input,
+.mud-select.bracket-round-scenario-select input.mud-input-root {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
 
 .bracket-round-scenario-readonly {
     line-height: 1.25;
-    word-break: break-word;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .bracket-round-surface-host {
@@ -393,26 +498,46 @@ h1:focus {
     max-width: 100%;
 }
 
-.bracket-match-editor-panel {
-    position: fixed;
-    top: calc(var(--mud-appbar-height, 64px) + 12px);
-    right: 12px;
-    width: min(22rem, calc(100vw - 24px));
-    max-height: calc(100dvh - var(--mud-appbar-height, 64px) - 24px);
-    overflow: auto;
-    z-index: 1200;
-}
-
-.bracket-match-editor-panel-header {
-    display: flex;
+.bracket-editor-toolbar {
     align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
 }
 
-.bracket-match-editor-panel-header .mud-typography-h6 {
-    flex: 1;
-    min-width: 0;
+.bracket-editor-toolbar .bracket-inline-action {
+    flex: 0 0 auto;
+    align-self: center;
+}
+
+.bracket-editor-toolbar .bracket-inline-action--checkbox {
+    max-width: min(100%, 22rem);
+}
+
+.match-editor-dialog-title {
+    width: 100%;
+}
+
+.match-editor-dialog-content {
+    max-height: min(70dvh, 640px);
+    overflow-y: auto;
+}
+
+@media (max-width: 600px) {
+    .match-editor-dialog {
+        width: 100%;
+        max-width: 100%;
+        height: 100%;
+        max-height: 100%;
+        margin: 0;
+    }
+
+    .match-editor-dialog .mud-dialog-content {
+        max-height: none;
+        flex: 1 1 auto;
+        overflow-y: auto;
+    }
+
+    .match-editor-dialog .mud-dialog-actions {
+        flex-shrink: 0;
+    }
 }
 
 .template-graph-edges {

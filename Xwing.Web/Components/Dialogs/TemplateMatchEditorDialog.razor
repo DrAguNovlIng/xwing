@@ -1,0 +1,439 @@
+@inject ITournamentTemplateStore TemplateStore
+
+<MudDialog Class="match-editor-dialog">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="match-editor-dialog-title">
+            <MudText Typo="Typo.h6">Match</MudText>
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                           aria-label="Close"
+                           OnClick="CloseAsync" />
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <div class="match-editor-dialog-content">
+        @if (graph is null || selectedMatch is null)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            <MudTextField @bind-Value="editMatchName"
+                          Label="Name"
+                          Variant="Variant.Outlined"
+                          Class="mb-3"
+                          Immediate="true"
+                          OnBlur="OnMatchNameBlurAsync" />
+            <MudSelect T="string"
+                       Label="Slot A"
+                       Variant="Variant.Outlined"
+                       Value="@slotAValue"
+                       ValueChanged="OnSlotAChangedAsync"
+                       ToStringFunc="FormatStructureSlotSelect"
+                       Class="mb-2">
+                <MudSelectItem Value="@OpenSlotValue">Custom entrant</MudSelectItem>
+                @foreach (TemplateMatch other in OtherMatches(selectedMatch))
+                {
+                    if (IsOutcomeAvailableForSlot(other.TemplateMatchId, TemplateFeedOutcome.Winner, TemplateMatchSlot.A))
+                    {
+                        <MudSelectItem Value="@WinnerSlotValue(other.TemplateMatchId)">Winner of @DisplayName(other)</MudSelectItem>
+                    }
+                    if (IsOutcomeAvailableForSlot(other.TemplateMatchId, TemplateFeedOutcome.Loser, TemplateMatchSlot.A))
+                    {
+                        <MudSelectItem Value="@LoserSlotValue(other.TemplateMatchId)">Loser of @DisplayName(other)</MudSelectItem>
+                    }
+                }
+            </MudSelect>
+            @if (slotAValue == OpenSlotValue)
+            {
+                <MudTextField @bind-Value="editSlotAOpenLabel"
+                              Label="Slot A entrant text"
+                              Variant="Variant.Outlined"
+                              Class="mb-3"
+                              Immediate="true"
+                              OnBlur="OnSlotAOpenLabelBlurAsync" />
+            }
+            else
+            {
+                <div class="mb-3" />
+            }
+            <MudSelect T="string"
+                       Label="Slot B"
+                       Variant="Variant.Outlined"
+                       Value="@slotBValue"
+                       ValueChanged="OnSlotBChangedAsync"
+                       ToStringFunc="FormatStructureSlotSelect"
+                       Class="mb-2">
+                <MudSelectItem Value="@OpenSlotValue">Custom entrant</MudSelectItem>
+                @foreach (TemplateMatch other in OtherMatches(selectedMatch))
+                {
+                    if (IsOutcomeAvailableForSlot(other.TemplateMatchId, TemplateFeedOutcome.Winner, TemplateMatchSlot.B))
+                    {
+                        <MudSelectItem Value="@WinnerSlotValue(other.TemplateMatchId)">Winner of @DisplayName(other)</MudSelectItem>
+                    }
+                    if (IsOutcomeAvailableForSlot(other.TemplateMatchId, TemplateFeedOutcome.Loser, TemplateMatchSlot.B))
+                    {
+                        <MudSelectItem Value="@LoserSlotValue(other.TemplateMatchId)">Loser of @DisplayName(other)</MudSelectItem>
+                    }
+                }
+            </MudSelect>
+            @if (slotBValue == OpenSlotValue)
+            {
+                <MudTextField @bind-Value="editSlotBOpenLabel"
+                              Label="Slot B entrant text"
+                              Variant="Variant.Outlined"
+                              Class="mb-4"
+                              Immediate="true"
+                              OnBlur="OnSlotBOpenLabelBlurAsync" />
+            }
+            else
+            {
+                <div class="mb-4" />
+            }
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Error"
+                       FullWidth="true"
+                       OnClick="DeleteMatchAsync">
+                Delete match
+            </MudButton>
+        }
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@errorMessage</MudAlert>
+        }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CloseAsync">Done</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private const string OpenSlotValue = "open";
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public int TournamentTemplateId { get; set; }
+
+    [Parameter]
+    public int TemplateMatchId { get; set; }
+
+    private TournamentTemplateGraph? graph;
+    private TemplateMatch? selectedMatch;
+    private string editMatchName = string.Empty;
+    private string slotAValue = OpenSlotValue;
+    private string slotBValue = OpenSlotValue;
+    private string editSlotAOpenLabel = string.Empty;
+    private string editSlotBOpenLabel = string.Empty;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadGraphAsync();
+    }
+
+    private async Task LoadGraphAsync()
+    {
+        Result<TournamentTemplateGraph> result = await TemplateStore.GetGraphAsync(TournamentTemplateId, CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            errorMessage = result.Error ?? "Could not load template.";
+            graph = null;
+            selectedMatch = null;
+            return;
+        }
+
+        graph = result.Value!;
+        selectedMatch = graph.Matches.FirstOrDefault(m => m.TemplateMatchId == TemplateMatchId);
+        if (selectedMatch is null)
+        {
+            errorMessage = "Match not found.";
+            return;
+        }
+
+        SyncFieldsFromMatch();
+    }
+
+    private void SyncFieldsFromMatch()
+    {
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        editMatchName = selectedMatch.Name ?? string.Empty;
+        slotAValue = GetSlotSelectValue(selectedMatch, TemplateMatchSlot.A);
+        slotBValue = GetSlotSelectValue(selectedMatch, TemplateMatchSlot.B);
+        editSlotAOpenLabel = selectedMatch.SlotAOpenLabel ?? string.Empty;
+        editSlotBOpenLabel = selectedMatch.SlotBOpenLabel ?? string.Empty;
+    }
+
+    private async Task CloseAsync()
+    {
+        await FlushPendingAsync();
+        MudDialog.Close(DialogResult.Ok(false));
+    }
+
+    private async Task FlushPendingAsync()
+    {
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        int matchId = selectedMatch.TemplateMatchId;
+        await SaveMatchNameForAsync(selectedMatch, editMatchName);
+        selectedMatch = FindMatchById(matchId);
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        if (slotAValue == OpenSlotValue)
+        {
+            await SaveSlotOpenLabelForAsync(selectedMatch, TemplateMatchSlot.A, editSlotAOpenLabel);
+            selectedMatch = FindMatchById(matchId);
+        }
+
+        if (selectedMatch is not null && slotBValue == OpenSlotValue)
+        {
+            await SaveSlotOpenLabelForAsync(selectedMatch, TemplateMatchSlot.B, editSlotBOpenLabel);
+        }
+    }
+
+    private TemplateMatch? FindMatchById(int matchId) =>
+        graph?.Matches.FirstOrDefault(m => m.TemplateMatchId == matchId);
+
+    private TemplateMatch? RefreshMatch(TemplateMatch match) =>
+        graph?.Matches.FirstOrDefault(m => m.TemplateMatchId == match.TemplateMatchId);
+
+    private async Task SaveMatchNameForAsync(TemplateMatch match, string name)
+    {
+        match = RefreshMatch(match) ?? match;
+        string trimmed = name.Trim();
+        string? current = match.Name;
+        if (string.Equals(current?.Trim(), trimmed, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        Result<TemplateMatch> result = await TemplateStore.UpdateMatchNameAsync(
+            match.TemplateMatchId,
+            trimmed,
+            match.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            errorMessage = result.Error ?? "Could not save name.";
+            return;
+        }
+
+        await LoadGraphAsync();
+    }
+
+    private async Task SaveSlotOpenLabelForAsync(TemplateMatch match, TemplateMatchSlot slot, string label)
+    {
+        match = RefreshMatch(match) ?? match;
+        string? current = slot == TemplateMatchSlot.A ? match.SlotAOpenLabel : match.SlotBOpenLabel;
+        string trimmed = label.Trim();
+        if (string.IsNullOrWhiteSpace(current) && string.IsNullOrWhiteSpace(trimmed))
+        {
+            return;
+        }
+
+        if (string.Equals(current?.Trim(), trimmed, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        Result<TemplateMatch> result = await TemplateStore.UpdateSlotOpenLabelAsync(
+            match.TemplateMatchId,
+            slot,
+            trimmed,
+            match.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            errorMessage = result.Error ?? "Could not save entrant text.";
+            return;
+        }
+
+        await LoadGraphAsync();
+    }
+
+    private async Task OnMatchNameBlurAsync(FocusEventArgs _) =>
+        await SaveMatchNameForAsync(selectedMatch!, editMatchName);
+
+    private async Task OnSlotAOpenLabelBlurAsync(FocusEventArgs _)
+    {
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        await SaveSlotOpenLabelForAsync(selectedMatch, TemplateMatchSlot.A, editSlotAOpenLabel);
+    }
+
+    private async Task OnSlotBOpenLabelBlurAsync(FocusEventArgs _)
+    {
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        await SaveSlotOpenLabelForAsync(selectedMatch, TemplateMatchSlot.B, editSlotBOpenLabel);
+    }
+
+    private bool IsOutcomeAvailableForSlot(int sourceMatchId, TemplateFeedOutcome outcome, TemplateMatchSlot slot)
+    {
+        if (selectedMatch is null || graph is null)
+        {
+            return false;
+        }
+
+        TemplateMatchFeed? existing = graph.Feeds.SingleOrDefault(
+            f => f.SourceTemplateMatchId == sourceMatchId && f.SourceOutcome == outcome);
+        if (existing is null)
+        {
+            return true;
+        }
+
+        return existing.TargetTemplateMatchId == selectedMatch.TemplateMatchId && existing.TargetSlot == slot;
+    }
+
+    private string GetSlotSelectValue(TemplateMatch match, TemplateMatchSlot slot)
+    {
+        TemplateMatchFeed? feed = graph!.Feeds.SingleOrDefault(
+            f => f.TargetTemplateMatchId == match.TemplateMatchId && f.TargetSlot == slot);
+        if (feed is null)
+        {
+            return OpenSlotValue;
+        }
+
+        return feed.SourceOutcome == TemplateFeedOutcome.Winner
+            ? WinnerSlotValue(feed.SourceTemplateMatchId)
+            : LoserSlotValue(feed.SourceTemplateMatchId);
+    }
+
+    private static string WinnerSlotValue(int sourceMatchId) => $"w:{sourceMatchId}";
+    private static string LoserSlotValue(int sourceMatchId) => $"l:{sourceMatchId}";
+    private IEnumerable<TemplateMatch> OtherMatches(TemplateMatch match) =>
+        graph!.Matches.Where(m => m.TemplateMatchId != match.TemplateMatchId);
+
+    private static string DisplayName(TemplateMatch match) =>
+        string.IsNullOrWhiteSpace(match.Name) ? $"Match {match.TemplateMatchId}" : match.Name!;
+
+    private string FormatStructureSlotSelect(string value)
+    {
+        if (value == OpenSlotValue)
+        {
+            return "Custom entrant";
+        }
+
+        if (TryParseSlotValue(value, out int? sourceId, out TemplateFeedOutcome? outcome) &&
+            sourceId is not null &&
+            outcome is not null &&
+            graph is not null)
+        {
+            TemplateMatch? source = graph.Matches.FirstOrDefault(m => m.TemplateMatchId == sourceId);
+            string sourceName = source is null ? "?" : DisplayName(source);
+            return outcome == TemplateFeedOutcome.Winner
+                ? $"Winner of {sourceName}"
+                : $"Loser of {sourceName}";
+        }
+
+        return value;
+    }
+
+    private async Task OnSlotAChangedAsync(string value) => await SetSlotAsync(TemplateMatchSlot.A, value);
+    private async Task OnSlotBChangedAsync(string value) => await SetSlotAsync(TemplateMatchSlot.B, value);
+
+    private async Task SetSlotAsync(TemplateMatchSlot slot, string value)
+    {
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        if (!TryParseSlotValue(value, out int? sourceId, out TemplateFeedOutcome? outcome))
+        {
+            return;
+        }
+
+        Result result = await TemplateStore.SetSlotFeedAsync(
+            selectedMatch.TemplateMatchId,
+            slot,
+            sourceId,
+            outcome,
+            selectedMatch.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            errorMessage = result.Error ?? "Could not update slot.";
+            SyncFieldsFromMatch();
+            return;
+        }
+
+        slotAValue = slot == TemplateMatchSlot.A ? value : slotAValue;
+        slotBValue = slot == TemplateMatchSlot.B ? value : slotBValue;
+        await LoadGraphAsync();
+    }
+
+    private static bool TryParseSlotValue(string value, out int? sourceId, out TemplateFeedOutcome? outcome)
+    {
+        sourceId = null;
+        outcome = null;
+        if (value == OpenSlotValue)
+        {
+            return true;
+        }
+
+        if (value.StartsWith("w:", StringComparison.Ordinal)
+            && int.TryParse(value.AsSpan(2), out int winnerId))
+        {
+            sourceId = winnerId;
+            outcome = TemplateFeedOutcome.Winner;
+            return true;
+        }
+
+        if (value.StartsWith("l:", StringComparison.Ordinal)
+            && int.TryParse(value.AsSpan(2), out int loserId))
+        {
+            sourceId = loserId;
+            outcome = TemplateFeedOutcome.Loser;
+            return true;
+        }
+
+        return false;
+    }
+
+    private async Task DeleteMatchAsync()
+    {
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        await FlushPendingAsync();
+        selectedMatch = FindMatchById(TemplateMatchId);
+        if (selectedMatch is null)
+        {
+            MudDialog.Close(DialogResult.Ok(true));
+            return;
+        }
+
+        Result result = await TemplateStore.DeleteMatchAsync(
+            selectedMatch.TemplateMatchId,
+            selectedMatch.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            errorMessage = result.Error ?? "Could not delete match.";
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

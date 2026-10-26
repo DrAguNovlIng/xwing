@@ -61,9 +61,9 @@
     private string userName = string.Empty;
     protected override async Task OnInitializedAsync()
     {
-        showUsersNav = !await UserStore.AnyAdminExistsAsync(CancellationToken.None).ConfigureAwait(false);
+        showUsersNav = !await UserStore.AnyAdminExistsAsync(CancellationToken.None);
         showLoginNav = !showUsersNav;
-        AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync().ConfigureAwait(false);
+        AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         isSignedIn = authState.User.Identity?.IsAuthenticated == true;
         isAdmin = authState.User.IsInRole(UserRoles.Admin);
         userName = authState.User.Identity?.Name ?? string.Empty;

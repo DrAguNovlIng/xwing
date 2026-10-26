@@ -1,0 +1,728 @@
+@inject ITournamentBracketStore BracketStore
+
+<MudDialog Class="match-editor-dialog">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="match-editor-dialog-title">
+            <MudText Typo="Typo.h6">Match</MudText>
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                           aria-label="Close"
+                           OnClick="CloseAsync" />
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <div class="match-editor-dialog-content">
+        @if (graph is null || selectedMatch is null)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            <MudTextField @bind-Value="editMatchName"
+                          Label="Name"
+                          Variant="Variant.Outlined"
+                          Class="mb-3"
+                          Immediate="true"
+                          OnBlur="OnMatchNameBlurAsync" />
+            <MudDivider Class="my-3" />
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Results</MudText>
+            <MudSelect T="TournamentMatchStatus"
+                       Value="editStatus"
+                       ValueChanged="OnEditStatusChangedAsync"
+                       Label="Status"
+                       Variant="Variant.Outlined"
+                       Class="mb-2">
+                <MudSelectItem Value="TournamentMatchStatus.NotStarted">Not started</MudSelectItem>
+                <MudSelectItem Value="TournamentMatchStatus.InProgress">In progress</MudSelectItem>
+                <MudSelectItem Value="TournamentMatchStatus.Finished">Finished</MudSelectItem>
+            </MudSelect>
+            <MudSelect T="TournamentMatchPlayMode"
+                       Value="editPlayMode"
+                       ValueChanged="OnEditPlayModeChangedAsync"
+                       Label="Play mode"
+                       Variant="Variant.Outlined"
+                       Class="mb-2">
+                <MudSelectItem Value="TournamentMatchPlayMode.Offline">Offline</MudSelectItem>
+                <MudSelectItem Value="TournamentMatchPlayMode.Online">Online</MudSelectItem>
+            </MudSelect>
+            @if (editPlayMode == TournamentMatchPlayMode.Online)
+            {
+                <MudTextField @bind-Value="editReplayUrl"
+                              Label="@ReplayUrlFieldLabel"
+                              Variant="Variant.Outlined"
+                              Class="mb-2"
+                              Immediate="true"
+                              OnBlur="OnReplayUrlBlurAsync" />
+            }
+            <MudSelect T="int?"
+                       Label="Slot A player"
+                       Variant="Variant.Outlined"
+                       Value="editSlotAUserId"
+                       ValueChanged="OnEditSlotAUserChangedAsync"
+                       ToStringFunc="FormatPlayerSelect"
+                       Class="mb-2">
+                <MudSelectItem T="int?" Value="@((int?)null)">—</MudSelectItem>
+                @foreach (TournamentBracketParticipant player in AssignablePlayers(selectedMatch))
+                {
+                    <MudSelectItem T="int?" Value="@player.UserId">@player.UserName</MudSelectItem>
+                }
+            </MudSelect>
+            <MudNumericField T="int?"
+                             Value="editSlotAPoints"
+                             ValueChanged="OnEditSlotAPointsChangedAsync"
+                             Label="Slot A points"
+                             Variant="Variant.Outlined"
+                             Min="0"
+                             Class="mb-2" />
+            <MudSelect T="int?"
+                       Label="Slot B player"
+                       Variant="Variant.Outlined"
+                       Value="editSlotBUserId"
+                       ValueChanged="OnEditSlotBUserChangedAsync"
+                       ToStringFunc="FormatPlayerSelect"
+                       Class="mb-2">
+                <MudSelectItem T="int?" Value="@((int?)null)">—</MudSelectItem>
+                @foreach (TournamentBracketParticipant player in AssignablePlayers(selectedMatch))
+                {
+                    <MudSelectItem T="int?" Value="@player.UserId">@player.UserName</MudSelectItem>
+                }
+            </MudSelect>
+            <MudNumericField T="int?"
+                             Value="editSlotBPoints"
+                             ValueChanged="OnEditSlotBPointsChangedAsync"
+                             Label="Slot B points"
+                             Variant="Variant.Outlined"
+                             Min="0"
+                             Class="mb-2" />
+            <MudSelect T="TournamentMatchWinner"
+                       Value="editWinner"
+                       ValueChanged="OnEditWinnerChangedAsync"
+                       ToStringFunc="FormatWinnerOption"
+                       Label="Winner"
+                       Variant="Variant.Outlined"
+                       Class="mb-4">
+                <MudSelectItem Value="TournamentMatchWinner.None">Neither</MudSelectItem>
+                <MudSelectItem Value="TournamentMatchWinner.SlotA">@FormatWinnerOption(TournamentMatchWinner.SlotA)</MudSelectItem>
+                <MudSelectItem Value="TournamentMatchWinner.SlotB">@FormatWinnerOption(TournamentMatchWinner.SlotB)</MudSelectItem>
+            </MudSelect>
+            <MudDivider Class="my-3" />
+            <MudSelect T="string"
+                       Label="Slot A"
+                       Variant="Variant.Outlined"
+                       Value="@slotAValue"
+                       ValueChanged="OnSlotAChangedAsync"
+                       ToStringFunc="FormatStructureSlotSelect"
+                       Class="mb-2">
+                <MudSelectItem T="string" Value="@OpenSlotValue">Custom entrant</MudSelectItem>
+                @foreach (TournamentMatch other in OtherMatches(selectedMatch))
+                {
+                    if (IsOutcomeAvailableForSlot(other.TournamentMatchId, TemplateFeedOutcome.Winner, TemplateMatchSlot.A))
+                    {
+                        <MudSelectItem T="string" Value="@WinnerSlotValue(other.TournamentMatchId)">Winner of @DisplayName(other)</MudSelectItem>
+                    }
+                    if (IsOutcomeAvailableForSlot(other.TournamentMatchId, TemplateFeedOutcome.Loser, TemplateMatchSlot.A))
+                    {
+                        <MudSelectItem T="string" Value="@LoserSlotValue(other.TournamentMatchId)">Loser of @DisplayName(other)</MudSelectItem>
+                    }
+                }
+            </MudSelect>
+            @if (slotAValue == OpenSlotValue)
+            {
+                <MudTextField @bind-Value="editSlotAOpenLabel"
+                              Label="Slot A entrant text"
+                              Variant="Variant.Outlined"
+                              Class="mb-3"
+                              OnBlur="OnSlotAOpenLabelBlurAsync" />
+            }
+            else
+            {
+                <div class="mb-3" />
+            }
+            <MudSelect T="string"
+                       Label="Slot B"
+                       Variant="Variant.Outlined"
+                       Value="@slotBValue"
+                       ValueChanged="OnSlotBChangedAsync"
+                       ToStringFunc="FormatStructureSlotSelect"
+                       Class="mb-2">
+                <MudSelectItem T="string" Value="@OpenSlotValue">Custom entrant</MudSelectItem>
+                @foreach (TournamentMatch other in OtherMatches(selectedMatch))
+                {
+                    if (IsOutcomeAvailableForSlot(other.TournamentMatchId, TemplateFeedOutcome.Winner, TemplateMatchSlot.B))
+                    {
+                        <MudSelectItem T="string" Value="@WinnerSlotValue(other.TournamentMatchId)">Winner of @DisplayName(other)</MudSelectItem>
+                    }
+                    if (IsOutcomeAvailableForSlot(other.TournamentMatchId, TemplateFeedOutcome.Loser, TemplateMatchSlot.B))
+                    {
+                        <MudSelectItem T="string" Value="@LoserSlotValue(other.TournamentMatchId)">Loser of @DisplayName(other)</MudSelectItem>
+                    }
+                }
+            </MudSelect>
+            @if (slotBValue == OpenSlotValue)
+            {
+                <MudTextField @bind-Value="editSlotBOpenLabel"
+                              Label="Slot B entrant text"
+                              Variant="Variant.Outlined"
+                              Class="mb-4"
+                              OnBlur="OnSlotBOpenLabelBlurAsync" />
+            }
+            else
+            {
+                <div class="mb-4" />
+            }
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Error"
+                       FullWidth="true"
+                       OnClick="DeleteMatchAsync">
+                Delete match
+            </MudButton>
+        }
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@errorMessage</MudAlert>
+        }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CloseAsync">Done</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private const string OpenSlotValue = "open";
+    private const string ReplayUrlFieldLabel = "Replay code";
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public int TournamentId { get; set; }
+
+    [Parameter]
+    public int TournamentMatchId { get; set; }
+
+    private TournamentBracketGraph? graph;
+    private TournamentMatch? selectedMatch;
+    private string editMatchName = string.Empty;
+    private string slotAValue = OpenSlotValue;
+    private string slotBValue = OpenSlotValue;
+    private string editSlotAOpenLabel = string.Empty;
+    private string editSlotBOpenLabel = string.Empty;
+    private TournamentMatchStatus editStatus = TournamentMatchStatus.NotStarted;
+    private TournamentMatchPlayMode editPlayMode = TournamentMatchPlayMode.Offline;
+    private string? editReplayUrl;
+    private int? editSlotAUserId;
+    private int? editSlotBUserId;
+    private int? editSlotAPoints;
+    private int? editSlotBPoints;
+    private TournamentMatchWinner editWinner = TournamentMatchWinner.None;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadGraphAsync();
+    }
+
+    private async Task LoadGraphAsync()
+    {
+        Result<TournamentBracketGraph> result = await BracketStore.GetGraphAsync(TournamentId, CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            errorMessage = result.Error ?? "Could not load tournament.";
+            graph = null;
+            selectedMatch = null;
+            return;
+        }
+
+        graph = result.Value!;
+        selectedMatch = graph.Matches.FirstOrDefault(m => m.TournamentMatchId == TournamentMatchId);
+        if (selectedMatch is null)
+        {
+            errorMessage = "Match not found.";
+            return;
+        }
+
+        SyncFieldsFromMatch();
+    }
+
+    private void SyncFieldsFromMatch()
+    {
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        editMatchName = selectedMatch.Name ?? string.Empty;
+        slotAValue = GetSlotSelectValue(selectedMatch, TemplateMatchSlot.A);
+        slotBValue = GetSlotSelectValue(selectedMatch, TemplateMatchSlot.B);
+        editSlotAOpenLabel = selectedMatch.SlotAOpenLabel ?? string.Empty;
+        editSlotBOpenLabel = selectedMatch.SlotBOpenLabel ?? string.Empty;
+        editStatus = selectedMatch.Status;
+        editPlayMode = selectedMatch.PlayMode;
+        editReplayUrl = FourGgReplay.GetCodeForDisplay(selectedMatch.ReplayUrl) ?? string.Empty;
+        editSlotAUserId = selectedMatch.SlotAUserId;
+        editSlotBUserId = selectedMatch.SlotBUserId;
+        editSlotAPoints = selectedMatch.SlotAPoints;
+        editSlotBPoints = selectedMatch.SlotBPoints;
+        editWinner = selectedMatch.Winner;
+    }
+
+    private sealed record EditorSnapshot(
+        string MatchName,
+        TournamentMatchStatus Status,
+        TournamentMatchPlayMode PlayMode,
+        string? ReplayUrl,
+        int? SlotAUserId,
+        int? SlotBUserId,
+        int? SlotAPoints,
+        int? SlotBPoints,
+        TournamentMatchWinner Winner,
+        string SlotAValue,
+        string SlotBValue,
+        string SlotAOpenLabel,
+        string SlotBOpenLabel);
+
+    private EditorSnapshot CaptureSnapshot() =>
+        new(
+            editMatchName,
+            editStatus,
+            editPlayMode,
+            editReplayUrl,
+            editSlotAUserId,
+            editSlotBUserId,
+            editSlotAPoints,
+            editSlotBPoints,
+            editWinner,
+            slotAValue,
+            slotBValue,
+            editSlotAOpenLabel,
+            editSlotBOpenLabel);
+
+    private async Task CloseAsync()
+    {
+        await FlushPendingAsync();
+        MudDialog.Close(DialogResult.Ok(false));
+    }
+
+    private async Task FlushPendingAsync()
+    {
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        int matchId = selectedMatch.TournamentMatchId;
+        await SaveMatchNameForAsync(selectedMatch, editMatchName);
+        selectedMatch = FindMatchById(matchId);
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        await SaveMatchResultForAsync(selectedMatch, CaptureSnapshot());
+        selectedMatch = FindMatchById(matchId);
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        if (slotAValue == OpenSlotValue)
+        {
+            await SaveSlotOpenLabelForAsync(selectedMatch, TemplateMatchSlot.A, editSlotAOpenLabel);
+            selectedMatch = FindMatchById(matchId);
+        }
+
+        if (selectedMatch is not null && slotBValue == OpenSlotValue)
+        {
+            await SaveSlotOpenLabelForAsync(selectedMatch, TemplateMatchSlot.B, editSlotBOpenLabel);
+        }
+    }
+
+    private IEnumerable<TournamentBracketParticipant> AssignablePlayers(TournamentMatch match) =>
+        graph?.Participants.Where(p =>
+            p.IsActive || p.UserId == match.SlotAUserId || p.UserId == match.SlotBUserId) ?? [];
+
+    private Task OnEditStatusChangedAsync(TournamentMatchStatus value)
+    {
+        editStatus = value;
+        return SaveBoundResultAsync();
+    }
+
+    private Task OnEditPlayModeChangedAsync(TournamentMatchPlayMode value)
+    {
+        editPlayMode = value;
+        return SaveBoundResultAsync();
+    }
+
+    private Task OnEditSlotAUserChangedAsync(int? value)
+    {
+        editSlotAUserId = value;
+        return SaveBoundResultAsync();
+    }
+
+    private Task OnEditSlotBUserChangedAsync(int? value)
+    {
+        editSlotBUserId = value;
+        return SaveBoundResultAsync();
+    }
+
+    private Task OnEditSlotAPointsChangedAsync(int? value)
+    {
+        editSlotAPoints = value;
+        return SaveBoundResultAsync();
+    }
+
+    private Task OnEditSlotBPointsChangedAsync(int? value)
+    {
+        editSlotBPoints = value;
+        return SaveBoundResultAsync();
+    }
+
+    private Task OnEditWinnerChangedAsync(TournamentMatchWinner value)
+    {
+        editWinner = value;
+        if (value != TournamentMatchWinner.None)
+        {
+            editStatus = TournamentMatchStatus.Finished;
+        }
+
+        return SaveBoundResultAsync();
+    }
+
+    private string FormatWinnerOption(TournamentMatchWinner winner) =>
+        winner switch
+        {
+            TournamentMatchWinner.SlotA => FormatWinnerSlotLabel(editSlotAUserId, "Slot A"),
+            TournamentMatchWinner.SlotB => FormatWinnerSlotLabel(editSlotBUserId, "Slot B"),
+            _ => "Neither",
+        };
+
+    private string FormatWinnerSlotLabel(int? userId, string slotLabel)
+    {
+        if (userId is not int id || graph is null)
+        {
+            return slotLabel;
+        }
+
+        string name = graph.Participants.FirstOrDefault(p => p.UserId == id)?.UserName ?? $"User {id}";
+        return $"{name} ({slotLabel})";
+    }
+
+    private async Task SaveBoundResultAsync()
+    {
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        await SaveMatchResultForAsync(selectedMatch, CaptureSnapshot());
+    }
+
+    private TournamentMatch? FindMatchById(int matchId) =>
+        graph?.Matches.FirstOrDefault(m => m.TournamentMatchId == matchId);
+
+    private TournamentMatch? RefreshMatch(TournamentMatch match) =>
+        graph?.Matches.FirstOrDefault(m => m.TournamentMatchId == match.TournamentMatchId);
+
+    private async Task SaveMatchNameForAsync(TournamentMatch match, string name)
+    {
+        match = RefreshMatch(match) ?? match;
+        string trimmed = name.Trim();
+        string? current = match.Name;
+        if (string.Equals(current?.Trim(), trimmed, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        Result<TournamentMatch> result = await BracketStore.UpdateMatchNameAsync(
+            match.TournamentMatchId,
+            trimmed,
+            match.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            errorMessage = result.Error ?? "Could not save name.";
+            return;
+        }
+
+        await LoadGraphAsync();
+    }
+
+    private async Task SaveMatchResultForAsync(TournamentMatch match, EditorSnapshot snapshot)
+    {
+        match = RefreshMatch(match) ?? match;
+        if (!HasPendingResultChangesFor(match, snapshot))
+        {
+            return;
+        }
+
+        var update = new TournamentMatchResultUpdate(
+            snapshot.Status,
+            snapshot.PlayMode,
+            snapshot.ReplayUrl,
+            snapshot.SlotAUserId,
+            snapshot.SlotBUserId,
+            snapshot.SlotAPoints,
+            snapshot.SlotBPoints,
+            snapshot.Winner);
+        Result<TournamentMatch> result = await BracketStore.UpdateMatchResultAsync(
+            TournamentId,
+            match.TournamentMatchId,
+            update,
+            match.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            errorMessage = result.Error ?? "Could not save results.";
+            return;
+        }
+
+        await LoadGraphAsync();
+    }
+
+    private async Task SaveSlotOpenLabelForAsync(TournamentMatch match, TemplateMatchSlot slot, string label)
+    {
+        match = RefreshMatch(match) ?? match;
+        string? current = slot == TemplateMatchSlot.A ? match.SlotAOpenLabel : match.SlotBOpenLabel;
+        string trimmed = label.Trim();
+        if (string.IsNullOrWhiteSpace(current) && string.IsNullOrWhiteSpace(trimmed))
+        {
+            return;
+        }
+
+        if (string.Equals(current?.Trim(), trimmed, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        Result<TournamentMatch> result = await BracketStore.UpdateSlotOpenLabelAsync(
+            match.TournamentMatchId,
+            slot,
+            trimmed,
+            match.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            errorMessage = result.Error ?? "Could not save entrant text.";
+            return;
+        }
+
+        await LoadGraphAsync();
+    }
+
+    private async Task OnMatchNameBlurAsync(FocusEventArgs _) =>
+        await SaveMatchNameForAsync(selectedMatch!, editMatchName);
+
+    private async Task OnReplayUrlBlurAsync(FocusEventArgs _)
+    {
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        await SaveMatchResultForAsync(selectedMatch, CaptureSnapshot());
+    }
+
+    private async Task OnSlotAOpenLabelBlurAsync(FocusEventArgs _)
+    {
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        await SaveSlotOpenLabelForAsync(selectedMatch, TemplateMatchSlot.A, editSlotAOpenLabel);
+    }
+
+    private async Task OnSlotBOpenLabelBlurAsync(FocusEventArgs _)
+    {
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        await SaveSlotOpenLabelForAsync(selectedMatch, TemplateMatchSlot.B, editSlotBOpenLabel);
+    }
+
+    private static bool HasPendingResultChangesFor(TournamentMatch match, EditorSnapshot snapshot) =>
+        snapshot.Status != match.Status
+        || snapshot.PlayMode != match.PlayMode
+        || ReplayFieldChanged(match, snapshot.ReplayUrl)
+        || snapshot.SlotAUserId != match.SlotAUserId
+        || snapshot.SlotBUserId != match.SlotBUserId
+        || snapshot.SlotAPoints != match.SlotAPoints
+        || snapshot.SlotBPoints != match.SlotBPoints
+        || snapshot.Winner != match.Winner;
+
+    private bool IsOutcomeAvailableForSlot(int sourceMatchId, TemplateFeedOutcome outcome, TemplateMatchSlot slot)
+    {
+        if (selectedMatch is null || graph is null)
+        {
+            return false;
+        }
+
+        TournamentMatchFeed? existing = graph.Feeds.SingleOrDefault(
+            f => f.SourceTournamentMatchId == sourceMatchId && f.SourceOutcome == outcome);
+        if (existing is null)
+        {
+            return true;
+        }
+
+        return existing.TargetTournamentMatchId == selectedMatch.TournamentMatchId && existing.TargetSlot == slot;
+    }
+
+    private string GetSlotSelectValue(TournamentMatch match, TemplateMatchSlot slot)
+    {
+        TournamentMatchFeed? feed = graph!.Feeds.SingleOrDefault(
+            f => f.TargetTournamentMatchId == match.TournamentMatchId && f.TargetSlot == slot);
+        if (feed is null)
+        {
+            return OpenSlotValue;
+        }
+
+        return feed.SourceOutcome == TemplateFeedOutcome.Winner
+            ? WinnerSlotValue(feed.SourceTournamentMatchId)
+            : LoserSlotValue(feed.SourceTournamentMatchId);
+    }
+
+    private static string WinnerSlotValue(int sourceMatchId) => $"w:{sourceMatchId}";
+    private static string LoserSlotValue(int sourceMatchId) => $"l:{sourceMatchId}";
+    private IEnumerable<TournamentMatch> OtherMatches(TournamentMatch match) =>
+        graph!.Matches.Where(m => m.TournamentMatchId != match.TournamentMatchId);
+
+    private static string DisplayName(TournamentMatch match) =>
+        string.IsNullOrWhiteSpace(match.Name) ? $"Match {match.TournamentMatchId}" : match.Name!;
+
+    private static bool ReplayFieldChanged(TournamentMatch match, string? editReplayCode)
+    {
+        FourGgReplay.ValidateAndNormalize(editReplayCode, out string? desired);
+        string? currentCode = FourGgReplay.GetCodeForDisplay(match.ReplayUrl);
+        if (currentCode is not null)
+        {
+            return !string.Equals(currentCode, desired ?? string.Empty, StringComparison.Ordinal);
+        }
+
+        if (!string.IsNullOrWhiteSpace(match.ReplayUrl))
+        {
+            return !string.IsNullOrWhiteSpace(desired);
+        }
+
+        return !string.IsNullOrWhiteSpace(desired);
+    }
+
+    private string FormatPlayerSelect(int? userId) =>
+        userId is null
+            ? "-"
+            : graph?.Participants.FirstOrDefault(p => p.UserId == userId)?.UserName ?? $"User {userId}";
+
+    private string FormatStructureSlotSelect(string value)
+    {
+        if (value == OpenSlotValue)
+        {
+            return "Custom entrant";
+        }
+
+        if (TryParseSlotValue(value, out int? sourceId, out TemplateFeedOutcome? outcome) &&
+            sourceId is not null &&
+            outcome is not null &&
+            graph is not null)
+        {
+            TournamentMatch? source = graph.Matches.FirstOrDefault(m => m.TournamentMatchId == sourceId);
+            string sourceName = source is null ? "?" : DisplayName(source);
+            return outcome == TemplateFeedOutcome.Winner
+                ? $"Winner of {sourceName}"
+                : $"Loser of {sourceName}";
+        }
+
+        return value;
+    }
+
+    private async Task OnSlotAChangedAsync(string value) => await SetSlotAsync(TemplateMatchSlot.A, value);
+    private async Task OnSlotBChangedAsync(string value) => await SetSlotAsync(TemplateMatchSlot.B, value);
+
+    private async Task SetSlotAsync(TemplateMatchSlot slot, string value)
+    {
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        if (!TryParseSlotValue(value, out int? sourceId, out TemplateFeedOutcome? outcome))
+        {
+            return;
+        }
+
+        Result result = await BracketStore.SetSlotFeedAsync(
+            selectedMatch.TournamentMatchId,
+            slot,
+            sourceId,
+            outcome,
+            selectedMatch.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            errorMessage = result.Error ?? "Could not update slot.";
+            SyncFieldsFromMatch();
+            return;
+        }
+
+        slotAValue = slot == TemplateMatchSlot.A ? value : slotAValue;
+        slotBValue = slot == TemplateMatchSlot.B ? value : slotBValue;
+        await LoadGraphAsync();
+    }
+
+    private static bool TryParseSlotValue(string value, out int? sourceId, out TemplateFeedOutcome? outcome)
+    {
+        sourceId = null;
+        outcome = null;
+        if (value == OpenSlotValue)
+        {
+            return true;
+        }
+
+        if (value.StartsWith("w:", StringComparison.Ordinal)
+            && int.TryParse(value.AsSpan(2), out int winnerId))
+        {
+            sourceId = winnerId;
+            outcome = TemplateFeedOutcome.Winner;
+            return true;
+        }
+
+        if (value.StartsWith("l:", StringComparison.Ordinal)
+            && int.TryParse(value.AsSpan(2), out int loserId))
+        {
+            sourceId = loserId;
+            outcome = TemplateFeedOutcome.Loser;
+            return true;
+        }
+
+        return false;
+    }
+
+    private async Task DeleteMatchAsync()
+    {
+        if (selectedMatch is null)
+        {
+            return;
+        }
+
+        await FlushPendingAsync();
+        selectedMatch = FindMatchById(TournamentMatchId);
+        if (selectedMatch is null)
+        {
+            MudDialog.Close(DialogResult.Ok(true));
+            return;
+        }
+
+        Result result = await BracketStore.DeleteMatchAsync(
+            selectedMatch.TournamentMatchId,
+            selectedMatch.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            errorMessage = result.Error ?? "Could not delete match.";
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

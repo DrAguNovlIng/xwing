@@ -31,6 +31,7 @@ public sealed class TournamentStoreTests
                 "Regional Championship",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             result.IsSuccess.ShouldBeTrue();
             result.Value.ShouldNotBeNull();
@@ -55,6 +56,7 @@ public sealed class TournamentStoreTests
                 "   ",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             result.IsSuccess.ShouldBeFalse();
             result.Error.ShouldBe("Tournament name is required.");
@@ -73,6 +75,7 @@ public sealed class TournamentStoreTests
                 "Bad dates",
                 DefaultEnd,
                 DefaultStart,
+                false,
                 TestContext.Current.CancellationToken);
             result.IsSuccess.ShouldBeFalse();
             result.Error.ShouldBe("End date must be on or after the start date.");
@@ -91,11 +94,13 @@ public sealed class TournamentStoreTests
                 "Bravo",
                 new DateTimeOffset(2026, 12, 1, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 12, 2, 0, 0, 0, TimeSpan.Zero),
+                false,
                 TestContext.Current.CancellationToken);
             Result<Tournament> earlier = await stores.Tournaments.CreateAsync(
                 "Alpha",
                 new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 11, 2, 0, 0, 0, TimeSpan.Zero),
+                false,
                 TestContext.Current.CancellationToken);
             later.IsSuccess.ShouldBeTrue();
             earlier.IsSuccess.ShouldBeTrue();
@@ -119,6 +124,7 @@ public sealed class TournamentStoreTests
                 "Original",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             created.IsSuccess.ShouldBeTrue();
             DateTimeOffset newStart = new(2026, 12, 10, 0, 0, 0, TimeSpan.Zero);
@@ -128,6 +134,7 @@ public sealed class TournamentStoreTests
                 "Renamed",
                 newStart,
                 newEnd,
+                false,
                 created.Value.RowVersion,
                 TestContext.Current.CancellationToken);
             updated.IsSuccess.ShouldBeTrue();
@@ -149,6 +156,7 @@ public sealed class TournamentStoreTests
                 "ToDelete",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             created.IsSuccess.ShouldBeTrue();
             Result deleted = await stores.Tournaments.DeleteAsync(
@@ -173,6 +181,7 @@ public sealed class TournamentStoreTests
                 "Stale",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             created.IsSuccess.ShouldBeTrue();
             byte[] staleToken = new byte[created.Value!.RowVersion.Length];
@@ -181,6 +190,7 @@ public sealed class TournamentStoreTests
                 "Changed",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 staleToken,
                 TestContext.Current.CancellationToken);
             updated.IsSuccess.ShouldBeFalse();
@@ -196,8 +206,8 @@ public sealed class TournamentStoreTests
             cancellationToken: TestContext.Current.CancellationToken);
         using (stores)
         {
-            await stores.Tournaments.CreateAsync("Regional Open", DefaultStart, DefaultEnd, TestContext.Current.CancellationToken);
-            await stores.Tournaments.CreateAsync("Local League", DefaultStart, DefaultEnd, TestContext.Current.CancellationToken);
+            await stores.Tournaments.CreateAsync("Regional Open", DefaultStart, DefaultEnd, false, TestContext.Current.CancellationToken);
+            await stores.Tournaments.CreateAsync("Local League", DefaultStart, DefaultEnd, false, TestContext.Current.CancellationToken);
             IReadOnlyList<TournamentListItem> results = await stores.Tournaments.SearchAsync(
                 new TournamentSearchQuery { NameSearch = "regional" },
                 TestContext.Current.CancellationToken);
@@ -221,16 +231,19 @@ public sealed class TournamentStoreTests
                 "Past",
                 new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 10, 31, 0, 0, 0, TimeSpan.Zero),
+                false,
                 TestContext.Current.CancellationToken);
             await stores.Tournaments.CreateAsync(
                 "In progress",
                 new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 11, 5, 0, 0, 0, TimeSpan.Zero),
+                false,
                 TestContext.Current.CancellationToken);
             await stores.Tournaments.CreateAsync(
                 "Upcoming",
                 new DateTimeOffset(2026, 11, 10, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 11, 12, 0, 0, 0, TimeSpan.Zero),
+                false,
                 TestContext.Current.CancellationToken);
             IReadOnlyList<TournamentListItem> active = await stores.Tournaments.SearchAsync(
                 new TournamentSearchQuery { WhenFilter = TournamentWhenFilter.Active },
@@ -256,11 +269,13 @@ public sealed class TournamentStoreTests
                 "Past only",
                 new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 10, 31, 0, 0, 0, TimeSpan.Zero),
+                false,
                 TestContext.Current.CancellationToken);
             await stores.Tournaments.CreateAsync(
                 "Still active",
                 new DateTimeOffset(2026, 11, 10, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 11, 12, 0, 0, 0, TimeSpan.Zero),
+                false,
                 TestContext.Current.CancellationToken);
             IReadOnlyList<TournamentListItem> past = await stores.Tournaments.SearchAsync(
                 new TournamentSearchQuery { WhenFilter = TournamentWhenFilter.Past },
@@ -278,8 +293,8 @@ public sealed class TournamentStoreTests
             cancellationToken: TestContext.Current.CancellationToken);
         using (stores)
         {
-            await stores.Tournaments.CreateAsync("Alpha", DefaultStart, DefaultEnd, TestContext.Current.CancellationToken);
-            await stores.Tournaments.CreateAsync("Zulu", DefaultStart, DefaultEnd, TestContext.Current.CancellationToken);
+            await stores.Tournaments.CreateAsync("Alpha", DefaultStart, DefaultEnd, false, TestContext.Current.CancellationToken);
+            await stores.Tournaments.CreateAsync("Zulu", DefaultStart, DefaultEnd, false, TestContext.Current.CancellationToken);
             IReadOnlyList<TournamentListItem> results = await stores.Tournaments.SearchAsync(
                 new TournamentSearchQuery
                 {
@@ -317,14 +332,17 @@ public sealed class TournamentStoreTests
                 "Counted",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             await stores.Tournaments.JoinAsync(
                 tournament.Value!.TournamentId,
                 user1.Value!.UserId,
+                null,
                 TestContext.Current.CancellationToken);
             await stores.Tournaments.JoinAsync(
                 tournament.Value.TournamentId,
                 user2.Value!.UserId,
+                null,
                 TestContext.Current.CancellationToken);
             IReadOnlyList<TournamentListItem> all = await stores.Tournaments.ListAsync(
                 TestContext.Current.CancellationToken);
@@ -354,15 +372,18 @@ public sealed class TournamentStoreTests
                 "Open",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             tournament.IsSuccess.ShouldBeTrue();
             Result join = await stores.Tournaments.JoinAsync(
                 tournament.Value!.TournamentId,
                 user.Value!.UserId,
+                null,
                 TestContext.Current.CancellationToken);
             join.IsSuccess.ShouldBeTrue();
             IReadOnlyList<TournamentMember> members = await stores.Tournaments.ListMembersAsync(
                 tournament.Value.TournamentId,
+                null,
                 TestContext.Current.CancellationToken);
             members.Count.ShouldBe(1);
             members[0].UserName.ShouldBe("player");
@@ -389,14 +410,17 @@ public sealed class TournamentStoreTests
                 "Open",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             await stores.Tournaments.JoinAsync(
                 tournament.Value!.TournamentId,
                 user.Value!.UserId,
+                null,
                 TestContext.Current.CancellationToken);
             Result secondJoin = await stores.Tournaments.JoinAsync(
                 tournament.Value.TournamentId,
                 user.Value.UserId,
+                null,
                 TestContext.Current.CancellationToken);
             secondJoin.IsSuccess.ShouldBeFalse();
             secondJoin.Error.ShouldBe("You are already in this tournament.");
@@ -419,6 +443,7 @@ public sealed class TournamentStoreTests
             Result missingTournament = await stores.Tournaments.JoinAsync(
                 9999,
                 user.Value!.UserId,
+                null,
                 TestContext.Current.CancellationToken);
             missingTournament.IsSuccess.ShouldBeFalse();
             missingTournament.Error.ShouldBe("Tournament not found.");
@@ -426,10 +451,12 @@ public sealed class TournamentStoreTests
                 "Open",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             Result missingUser = await stores.Tournaments.JoinAsync(
                 tournament.Value!.TournamentId,
                 9999,
+                null,
                 TestContext.Current.CancellationToken);
             missingUser.IsSuccess.ShouldBeFalse();
             missingUser.Error.ShouldBe("User not found.");
@@ -456,10 +483,12 @@ public sealed class TournamentStoreTests
                 "Started",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             Result join = await stores.Tournaments.JoinAsync(
                 tournament.Value!.TournamentId,
                 user.Value!.UserId,
+                null,
                 TestContext.Current.CancellationToken);
             join.IsSuccess.ShouldBeFalse();
             join.Error.ShouldBe("The roster is closed for this tournament.");
@@ -486,6 +515,7 @@ public sealed class TournamentStoreTests
                 "Open",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             Result notJoined = await stores.Tournaments.LeaveAsync(
                 tournament.Value!.TournamentId,
@@ -496,6 +526,7 @@ public sealed class TournamentStoreTests
             await stores.Tournaments.JoinAsync(
                 tournament.Value.TournamentId,
                 user.Value.UserId,
+                null,
                 TestContext.Current.CancellationToken);
             Result leave = await stores.Tournaments.LeaveAsync(
                 tournament.Value.TournamentId,
@@ -504,6 +535,7 @@ public sealed class TournamentStoreTests
             leave.IsSuccess.ShouldBeTrue();
             IReadOnlyList<TournamentMember> members = await stores.Tournaments.ListMembersAsync(
                 tournament.Value.TournamentId,
+                null,
                 TestContext.Current.CancellationToken);
             members.ShouldBeEmpty();
         }
@@ -530,12 +562,14 @@ public sealed class TournamentStoreTests
                 "In progress",
                 new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 11, 5, 0, 0, 0, TimeSpan.Zero),
+                false,
                 TestContext.Current.CancellationToken);
             userId = user.Value!.UserId;
             tournamentId = tournament.Value!.TournamentId;
             await stores.Tournaments.JoinAsync(
                 tournamentId,
                 userId,
+                null,
                 TestContext.Current.CancellationToken);
         }
         DateTimeOffset afterStart = new(2026, 11, 2, 0, 0, 0, TimeSpan.Zero);
@@ -570,10 +604,12 @@ public sealed class TournamentStoreTests
                 "Open",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             await stores.Tournaments.JoinAsync(
                 tournament.Value!.TournamentId,
                 user.Value!.UserId,
+                null,
                 TestContext.Current.CancellationToken);
             Result deleted = await stores.Tournaments.DeleteAsync(
                 tournament.Value.TournamentId,
@@ -608,10 +644,12 @@ public sealed class TournamentStoreTests
                 "Open",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             await stores.Tournaments.JoinAsync(
                 tournament.Value!.TournamentId,
                 user.Value!.UserId,
+                null,
                 TestContext.Current.CancellationToken);
             Result deactivated = await stores.Users.DeactivateAsync(
                 user.Value.UserId,
@@ -619,6 +657,7 @@ public sealed class TournamentStoreTests
             deactivated.IsSuccess.ShouldBeTrue();
             IReadOnlyList<TournamentMember> membersAfter = await stores.Tournaments.ListMembersAsync(
                 tournament.Value!.TournamentId,
+                null,
                 TestContext.Current.CancellationToken);
             membersAfter.Any(m => m.UserId == user.Value.UserId).ShouldBeTrue();
         }
@@ -644,25 +683,30 @@ public sealed class TournamentStoreTests
                 "No squad yet",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             Result<Tournament> withSquad = await stores.Tournaments.CreateAsync(
                 "With squad",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             Result<Tournament> notJoined = await stores.Tournaments.CreateAsync(
                 "Not joined",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             int userId = user.Value!.UserId;
             await stores.Tournaments.JoinAsync(
                 noSquad.Value!.TournamentId,
                 userId,
+                null,
                 TestContext.Current.CancellationToken);
             await stores.Tournaments.JoinAsync(
                 withSquad.Value!.TournamentId,
                 userId,
+                null,
                 TestContext.Current.CancellationToken);
             Result saved = await stores.Tournaments.SetSquadAsync(
                 withSquad.Value.TournamentId,
@@ -713,10 +757,12 @@ public sealed class TournamentStoreTests
                 "Open",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             await stores.Tournaments.JoinAsync(
                 tournament.Value!.TournamentId,
                 user.Value!.UserId,
+                null,
                 TestContext.Current.CancellationToken);
             Result saved = await stores.Tournaments.SetSquadAsync(
                 tournament.Value.TournamentId,
@@ -726,6 +772,7 @@ public sealed class TournamentStoreTests
             saved.IsSuccess.ShouldBeTrue();
             IReadOnlyList<TournamentMember> members = await stores.Tournaments.ListMembersAsync(
                 tournament.Value.TournamentId,
+                user.Value.UserId,
                 TestContext.Current.CancellationToken);
             TournamentMember member = members.Single(m => m.UserId == user.Value.UserId);
             member.SquadFactionDisplay.ShouldBe("Rebel Alliance");
@@ -751,6 +798,7 @@ public sealed class TournamentStoreTests
                 "Open",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             Result saved = await stores.Tournaments.SetSquadAsync(
                 tournament.Value!.TournamentId,
@@ -783,12 +831,14 @@ public sealed class TournamentStoreTests
                 "Started",
                 DefaultStart,
                 DefaultEnd,
+                false,
                 TestContext.Current.CancellationToken);
             userId = user.Value!.UserId;
             tournamentId = tournament.Value!.TournamentId;
             await stores.Tournaments.JoinAsync(
                 tournamentId,
                 userId,
+                null,
                 TestContext.Current.CancellationToken);
         }
         using (TestStores storesAfterStart = TestServiceFactory.CreateStores(
@@ -802,6 +852,264 @@ public sealed class TournamentStoreTests
                 TestContext.Current.CancellationToken);
             saved.IsSuccess.ShouldBeFalse();
             saved.Error.ShouldBe("The roster is closed for this tournament.");
+        }
+    }
+
+    private const string EmpireSquadJson = """
+        {
+          "faction": "galacticempire",
+          "pilots": [{ "id": "darthvader", "ship": "tie-ln-fighter" }],
+          "vendor": { "yasb": { "url": "https://yasb.app/?d=empire" } }
+        }
+        """;
+
+    [Fact]
+    public async Task JoinAsyncShouldRejectWhenUniqueFactionsRequiresChoice()
+    {
+        DateTimeOffset today = new(2026, 10, 15, 0, 0, 0, TimeSpan.Zero);
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            new FixedTimeProvider(today),
+            TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<UserAccount> user = await stores.Users.CreateAsync(
+                "player",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+                "Unique",
+                DefaultStart,
+                DefaultEnd,
+                true,
+                TestContext.Current.CancellationToken);
+            Result join = await stores.Tournaments.JoinAsync(
+                tournament.Value!.TournamentId,
+                user.Value!.UserId,
+                null,
+                TestContext.Current.CancellationToken);
+            join.IsSuccess.ShouldBeFalse();
+            join.Error.ShouldBe("Choose a faction to join this tournament.");
+        }
+    }
+
+    [Fact]
+    public async Task JoinAsyncShouldRejectWhenFactionIsAlreadyTaken()
+    {
+        DateTimeOffset today = new(2026, 10, 15, 0, 0, 0, TimeSpan.Zero);
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            new FixedTimeProvider(today),
+            TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<UserAccount> first = await stores.Users.CreateAsync(
+                "first",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            Result<UserAccount> second = await stores.Users.CreateAsync(
+                "second",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+                "Unique",
+                DefaultStart,
+                DefaultEnd,
+                true,
+                TestContext.Current.CancellationToken);
+            await stores.Tournaments.JoinAsync(
+                tournament.Value!.TournamentId,
+                first.Value!.UserId,
+                "Rebel Alliance",
+                TestContext.Current.CancellationToken);
+            Result secondJoin = await stores.Tournaments.JoinAsync(
+                tournament.Value.TournamentId,
+                second.Value!.UserId,
+                "Rebel Alliance",
+                TestContext.Current.CancellationToken);
+            secondJoin.IsSuccess.ShouldBeFalse();
+            secondJoin.Error.ShouldBe("That faction is already taken.");
+        }
+    }
+
+    [Fact]
+    public async Task JoinAsyncShouldStoreClaimedFactionWhenUniqueFactionsOn()
+    {
+        DateTimeOffset today = new(2026, 10, 15, 0, 0, 0, TimeSpan.Zero);
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            new FixedTimeProvider(today),
+            TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<UserAccount> user = await stores.Users.CreateAsync(
+                "player",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+                "Unique",
+                DefaultStart,
+                DefaultEnd,
+                true,
+                TestContext.Current.CancellationToken);
+            Result join = await stores.Tournaments.JoinAsync(
+                tournament.Value!.TournamentId,
+                user.Value!.UserId,
+                "Galactic Empire",
+                TestContext.Current.CancellationToken);
+            join.IsSuccess.ShouldBeTrue();
+            IReadOnlyList<TournamentMember> members = await stores.Tournaments.ListMembersAsync(
+                tournament.Value.TournamentId,
+                user.Value.UserId,
+                TestContext.Current.CancellationToken);
+            TournamentMember self = members.Single();
+            self.SquadFactionDisplay.ShouldBe("Galactic Empire");
+            self.SquadShips.ShouldBeEmpty();
+            self.SquadUrl.ShouldBeNull();
+        }
+    }
+
+    [Fact]
+    public async Task SetSquadAsyncShouldRejectWhenFactionDoesNotMatchClaim()
+    {
+        DateTimeOffset today = new(2026, 10, 15, 0, 0, 0, TimeSpan.Zero);
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            new FixedTimeProvider(today),
+            TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<UserAccount> user = await stores.Users.CreateAsync(
+                "player",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+                "Unique",
+                DefaultStart,
+                DefaultEnd,
+                true,
+                TestContext.Current.CancellationToken);
+            await stores.Tournaments.JoinAsync(
+                tournament.Value!.TournamentId,
+                user.Value!.UserId,
+                "Rebel Alliance",
+                TestContext.Current.CancellationToken);
+            Result saved = await stores.Tournaments.SetSquadAsync(
+                tournament.Value.TournamentId,
+                user.Value.UserId,
+                EmpireSquadJson,
+                TestContext.Current.CancellationToken);
+            saved.IsSuccess.ShouldBeFalse();
+            saved.Error.ShouldBe("Your squad must use Rebel Alliance.");
+        }
+    }
+
+    [Fact]
+    public async Task ListMembersAsyncShouldHideOtherSquadsBeforeStartWhenUniqueFactionsOff()
+    {
+        DateTimeOffset today = new(2026, 10, 15, 0, 0, 0, TimeSpan.Zero);
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            new FixedTimeProvider(today),
+            TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<UserAccount> owner = await stores.Users.CreateAsync(
+                "owner",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            Result<UserAccount> viewer = await stores.Users.CreateAsync(
+                "viewer",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+                "Open",
+                DefaultStart,
+                DefaultEnd,
+                false,
+                TestContext.Current.CancellationToken);
+            await stores.Tournaments.JoinAsync(
+                tournament.Value!.TournamentId,
+                owner.Value!.UserId,
+                null,
+                TestContext.Current.CancellationToken);
+            await stores.Tournaments.JoinAsync(
+                tournament.Value.TournamentId,
+                viewer.Value!.UserId,
+                null,
+                TestContext.Current.CancellationToken);
+            await stores.Tournaments.SetSquadAsync(
+                tournament.Value.TournamentId,
+                owner.Value.UserId,
+                SampleSquadJson,
+                TestContext.Current.CancellationToken);
+            IReadOnlyList<TournamentMember> members = await stores.Tournaments.ListMembersAsync(
+                tournament.Value.TournamentId,
+                viewer.Value.UserId,
+                TestContext.Current.CancellationToken);
+            TournamentMember ownerRow = members.Single(m => m.UserId == owner.Value.UserId);
+            ownerRow.SquadFactionDisplay.ShouldBeNull();
+            ownerRow.SquadShips.ShouldBeEmpty();
+            ownerRow.SquadUrl.ShouldBeNull();
+        }
+    }
+
+    [Fact]
+    public async Task ListMembersAsyncShouldShowOtherFactionOnlyBeforeStartWhenUniqueFactionsOn()
+    {
+        DateTimeOffset today = new(2026, 10, 15, 0, 0, 0, TimeSpan.Zero);
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            new FixedTimeProvider(today),
+            TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<UserAccount> owner = await stores.Users.CreateAsync(
+                "owner",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            Result<UserAccount> viewer = await stores.Users.CreateAsync(
+                "viewer",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+                "Unique",
+                DefaultStart,
+                DefaultEnd,
+                true,
+                TestContext.Current.CancellationToken);
+            await stores.Tournaments.JoinAsync(
+                tournament.Value!.TournamentId,
+                owner.Value!.UserId,
+                "Rebel Alliance",
+                TestContext.Current.CancellationToken);
+            await stores.Tournaments.JoinAsync(
+                tournament.Value.TournamentId,
+                viewer.Value!.UserId,
+                "Galactic Empire",
+                TestContext.Current.CancellationToken);
+            await stores.Tournaments.SetSquadAsync(
+                tournament.Value.TournamentId,
+                owner.Value.UserId,
+                SampleSquadJson,
+                TestContext.Current.CancellationToken);
+            IReadOnlyList<TournamentMember> members = await stores.Tournaments.ListMembersAsync(
+                tournament.Value.TournamentId,
+                viewer.Value.UserId,
+                TestContext.Current.CancellationToken);
+            TournamentMember ownerRow = members.Single(m => m.UserId == owner.Value.UserId);
+            ownerRow.SquadFactionDisplay.ShouldBe("Rebel Alliance");
+            ownerRow.SquadShips.ShouldBeEmpty();
+            ownerRow.SquadUrl.ShouldBeNull();
         }
     }
 }

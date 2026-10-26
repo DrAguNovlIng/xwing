@@ -1,0 +1,81 @@
+@using Xwing.Web.Models
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Random scenario for round @TargetRoundNumber</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            Exclude scenarios you do not want, or enter a starting round to avoid repeating objectives used from that round through the previous round.
+        </MudText>
+        <MudText Typo="Typo.subtitle2" Class="mb-2">Exclude scenarios</MudText>
+        <MudStack Spacing="0">
+            @foreach (XwaScenario scenario in XwaScenarios.All)
+            {
+                bool excluded = excludedScenarios.Contains(scenario);
+                <MudCheckBox T="bool"
+                               Value="excluded"
+                               ValueChanged="value => SetExcluded(scenario, value)"
+                               Label="@XwaScenarios.GetDisplayLabel(scenario)"
+                               Dense="true" />
+            }
+        </MudStack>
+        @if (TargetRoundNumber > 1)
+        {
+            <MudNumericField T="int?"
+                             @bind-Value="excludeFromRoundNumber"
+                             Label="Exclude from round (optional)"
+                             HelperText="@($"Uses that round through round {TargetRoundNumber - 1}.")"
+                             Variant="Variant.Outlined"
+                             Min="1"
+                             Max="@(TargetRoundNumber - 1)"
+                             Class="mt-4"
+                             Clearable="true" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ChooseAsync">Choose</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public int TargetRoundNumber { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<XwaScenario?> RoundScenarios { get; set; } = [];
+
+    private readonly HashSet<XwaScenario> excludedScenarios = [];
+    private int? excludeFromRoundNumber;
+
+    private void SetExcluded(XwaScenario scenario, bool excluded)
+    {
+        if (excluded)
+        {
+            excludedScenarios.Add(scenario);
+        }
+        else
+        {
+            excludedScenarios.Remove(scenario);
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private Task ChooseAsync()
+    {
+        int targetIndex = TargetRoundNumber - 1;
+        XwaScenario chosen = RandomScenarioPicker.Pick(
+            RoundScenarios,
+            targetIndex,
+            excludedScenarios,
+            excludeFromRoundNumber,
+            Random.Shared);
+        MudDialog.Close(DialogResult.Ok(chosen));
+        return Task.CompletedTask;
+    }
+}
