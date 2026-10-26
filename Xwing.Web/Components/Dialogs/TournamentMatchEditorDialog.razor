@@ -18,164 +18,193 @@
         }
         else
         {
-            <MudTextField @bind-Value="editMatchName"
-                          Label="Name"
-                          Variant="Variant.Outlined"
-                          Class="mb-3"
-                          Immediate="true"
-                          OnBlur="OnMatchNameBlurAsync" />
-            <MudDivider Class="my-3" />
-            <MudText Typo="Typo.subtitle2" Class="mb-2">Results</MudText>
-            <MudSelect T="TournamentMatchStatus"
-                       Value="editStatus"
-                       ValueChanged="OnEditStatusChangedAsync"
-                       Label="Status"
-                       Variant="Variant.Outlined"
-                       Class="mb-2">
-                <MudSelectItem Value="TournamentMatchStatus.NotStarted">Not started</MudSelectItem>
-                <MudSelectItem Value="TournamentMatchStatus.InProgress">In progress</MudSelectItem>
-                <MudSelectItem Value="TournamentMatchStatus.Finished">Finished</MudSelectItem>
-            </MudSelect>
-            <MudSelect T="TournamentMatchPlayMode"
-                       Value="editPlayMode"
-                       ValueChanged="OnEditPlayModeChangedAsync"
-                       Label="Play mode"
-                       Variant="Variant.Outlined"
-                       Class="mb-2">
-                <MudSelectItem Value="TournamentMatchPlayMode.Offline">Offline</MudSelectItem>
-                <MudSelectItem Value="TournamentMatchPlayMode.Online">Online</MudSelectItem>
-            </MudSelect>
-            @if (editPlayMode == TournamentMatchPlayMode.Online)
-            {
-                <MudTextField @bind-Value="editReplayUrl"
-                              Label="@ReplayUrlFieldLabel"
+            <MudPaper Class="match-editor-section match-editor-section--match pa-3 mb-3" Outlined="true" Elevation="0">
+                <MudText Typo="Typo.subtitle2" Class="match-editor-section-heading mb-2">Match</MudText>
+                <MudTextField @bind-Value="editMatchName"
+                              Label="Name"
                               Variant="Variant.Outlined"
                               Class="mb-2"
                               Immediate="true"
-                              OnBlur="OnReplayUrlBlurAsync" />
-            }
-            <MudSelect T="int?"
-                       Label="Slot A player"
-                       Variant="Variant.Outlined"
-                       Value="editSlotAUserId"
-                       ValueChanged="OnEditSlotAUserChangedAsync"
-                       ToStringFunc="FormatPlayerSelect"
-                       Class="mb-2">
-                <MudSelectItem T="int?" Value="@((int?)null)">—</MudSelectItem>
-                @foreach (TournamentBracketParticipant player in AssignablePlayers(selectedMatch))
-                {
-                    <MudSelectItem T="int?" Value="@player.UserId">@player.UserName</MudSelectItem>
-                }
-            </MudSelect>
-            <MudNumericField T="int?"
-                             Value="editSlotAPoints"
-                             ValueChanged="OnEditSlotAPointsChangedAsync"
-                             Label="Slot A points"
-                             Variant="Variant.Outlined"
-                             Min="0"
-                             Class="mb-2" />
-            <MudSelect T="int?"
-                       Label="Slot B player"
-                       Variant="Variant.Outlined"
-                       Value="editSlotBUserId"
-                       ValueChanged="OnEditSlotBUserChangedAsync"
-                       ToStringFunc="FormatPlayerSelect"
-                       Class="mb-2">
-                <MudSelectItem T="int?" Value="@((int?)null)">—</MudSelectItem>
-                @foreach (TournamentBracketParticipant player in AssignablePlayers(selectedMatch))
-                {
-                    <MudSelectItem T="int?" Value="@player.UserId">@player.UserName</MudSelectItem>
-                }
-            </MudSelect>
-            <MudNumericField T="int?"
-                             Value="editSlotBPoints"
-                             ValueChanged="OnEditSlotBPointsChangedAsync"
-                             Label="Slot B points"
-                             Variant="Variant.Outlined"
-                             Min="0"
-                             Class="mb-2" />
-            <MudSelect T="TournamentMatchWinner"
-                       Value="editWinner"
-                       ValueChanged="OnEditWinnerChangedAsync"
-                       ToStringFunc="FormatWinnerOption"
-                       Label="Winner"
-                       Variant="Variant.Outlined"
-                       Class="mb-4">
-                <MudSelectItem Value="TournamentMatchWinner.None">Neither</MudSelectItem>
-                <MudSelectItem Value="TournamentMatchWinner.SlotA">@FormatWinnerOption(TournamentMatchWinner.SlotA)</MudSelectItem>
-                <MudSelectItem Value="TournamentMatchWinner.SlotB">@FormatWinnerOption(TournamentMatchWinner.SlotB)</MudSelectItem>
-            </MudSelect>
-            <MudDivider Class="my-3" />
-            <MudSelect T="string"
-                       Label="Slot A"
-                       Variant="Variant.Outlined"
-                       Value="@slotAValue"
-                       ValueChanged="OnSlotAChangedAsync"
-                       ToStringFunc="FormatStructureSlotSelect"
-                       Class="mb-2">
-                <MudSelectItem T="string" Value="@OpenSlotValue">Custom entrant</MudSelectItem>
-                @foreach (TournamentMatch other in OtherMatches(selectedMatch))
-                {
-                    if (IsOutcomeAvailableForSlot(other.TournamentMatchId, TemplateFeedOutcome.Winner, TemplateMatchSlot.A))
+                              OnBlur="OnMatchNameBlurAsync" />
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Wrap="Wrap.Wrap">
+                    <MudCheckBox T="bool"
+                                 Value="IsFinaleMatch"
+                                 ValueChanged="OnFinaleMatchToggledAsync"
+                                 Label="Finale match"
+                                 Color="Color.Warning" />
+                    @if (IsFinaleMatch)
                     {
-                        <MudSelectItem T="string" Value="@WinnerSlotValue(other.TournamentMatchId)">Winner of @DisplayName(other)</MudSelectItem>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">Finale</MudChip>
                     }
-                    if (IsOutcomeAvailableForSlot(other.TournamentMatchId, TemplateFeedOutcome.Loser, TemplateMatchSlot.A))
-                    {
-                        <MudSelectItem T="string" Value="@LoserSlotValue(other.TournamentMatchId)">Loser of @DisplayName(other)</MudSelectItem>
-                    }
-                }
-            </MudSelect>
-            @if (slotAValue == OpenSlotValue)
-            {
-                <MudTextField @bind-Value="editSlotAOpenLabel"
-                              Label="Slot A entrant text"
-                              Variant="Variant.Outlined"
-                              Class="mb-3"
-                              OnBlur="OnSlotAOpenLabelBlurAsync" />
-            }
-            else
-            {
-                <div class="mb-3" />
-            }
-            <MudSelect T="string"
-                       Label="Slot B"
-                       Variant="Variant.Outlined"
-                       Value="@slotBValue"
-                       ValueChanged="OnSlotBChangedAsync"
-                       ToStringFunc="FormatStructureSlotSelect"
-                       Class="mb-2">
-                <MudSelectItem T="string" Value="@OpenSlotValue">Custom entrant</MudSelectItem>
-                @foreach (TournamentMatch other in OtherMatches(selectedMatch))
+                </MudStack>
+            </MudPaper>
+
+            <MudPaper Class="match-editor-section match-editor-section--bracket pa-3 mb-3" Outlined="true" Elevation="0">
+                <MudText Typo="Typo.subtitle2" Class="match-editor-section-heading mb-2">Bracket</MudText>
+                <MudText Typo="Typo.caption" Class="mb-3 mud-text-secondary">Who advances into each slot on the bracket.</MudText>
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="string"
+                                   Label="Slot A feed"
+                                   Variant="Variant.Outlined"
+                                   Value="@slotAValue"
+                                   ValueChanged="OnSlotAChangedAsync"
+                                   ToStringFunc="FormatStructureSlotSelect"
+                                   Class="mb-2">
+                            <MudSelectItem T="string" Value="@OpenSlotValue">Custom entrant</MudSelectItem>
+                            @foreach (TournamentMatch other in OtherMatches(selectedMatch))
+                            {
+                                if (IsOutcomeAvailableForSlot(other.TournamentMatchId, TemplateFeedOutcome.Winner, TemplateMatchSlot.A))
+                                {
+                                    <MudSelectItem T="string" Value="@WinnerSlotValue(other.TournamentMatchId)">Winner of @DisplayName(other)</MudSelectItem>
+                                }
+                                if (IsOutcomeAvailableForSlot(other.TournamentMatchId, TemplateFeedOutcome.Loser, TemplateMatchSlot.A))
+                                {
+                                    <MudSelectItem T="string" Value="@LoserSlotValue(other.TournamentMatchId)">Loser of @DisplayName(other)</MudSelectItem>
+                                }
+                            }
+                        </MudSelect>
+                        @if (slotAValue == OpenSlotValue)
+                        {
+                            <MudTextField @bind-Value="editSlotAOpenLabel"
+                                          Label="Slot A entrant text"
+                                          Variant="Variant.Outlined"
+                                          OnBlur="OnSlotAOpenLabelBlurAsync" />
+                        }
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="string"
+                                   Label="Slot B feed"
+                                   Variant="Variant.Outlined"
+                                   Value="@slotBValue"
+                                   ValueChanged="OnSlotBChangedAsync"
+                                   ToStringFunc="FormatStructureSlotSelect"
+                                   Class="mb-2">
+                            <MudSelectItem T="string" Value="@OpenSlotValue">Custom entrant</MudSelectItem>
+                            @foreach (TournamentMatch other in OtherMatches(selectedMatch))
+                            {
+                                if (IsOutcomeAvailableForSlot(other.TournamentMatchId, TemplateFeedOutcome.Winner, TemplateMatchSlot.B))
+                                {
+                                    <MudSelectItem T="string" Value="@WinnerSlotValue(other.TournamentMatchId)">Winner of @DisplayName(other)</MudSelectItem>
+                                }
+                                if (IsOutcomeAvailableForSlot(other.TournamentMatchId, TemplateFeedOutcome.Loser, TemplateMatchSlot.B))
+                                {
+                                    <MudSelectItem T="string" Value="@LoserSlotValue(other.TournamentMatchId)">Loser of @DisplayName(other)</MudSelectItem>
+                                }
+                            }
+                        </MudSelect>
+                        @if (slotBValue == OpenSlotValue)
+                        {
+                            <MudTextField @bind-Value="editSlotBOpenLabel"
+                                          Label="Slot B entrant text"
+                                          Variant="Variant.Outlined"
+                                          OnBlur="OnSlotBOpenLabelBlurAsync" />
+                        }
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <MudPaper Class="match-editor-section match-editor-section--result pa-3 mb-3" Outlined="true" Elevation="0">
+                <MudText Typo="Typo.subtitle2" Class="match-editor-section-heading mb-2">Result</MudText>
+                <MudText Typo="Typo.caption" Class="mb-3 mud-text-secondary">Played match status, scores, and winner.</MudText>
+                <MudGrid Spacing="2" Class="mb-2">
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="TournamentMatchStatus"
+                                   Value="editStatus"
+                                   ValueChanged="OnEditStatusChangedAsync"
+                                   Label="Status"
+                                   Variant="Variant.Outlined">
+                            <MudSelectItem Value="TournamentMatchStatus.NotStarted">Not started</MudSelectItem>
+                            <MudSelectItem Value="TournamentMatchStatus.InProgress">In progress</MudSelectItem>
+                            <MudSelectItem Value="TournamentMatchStatus.Finished">Finished</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="TournamentMatchPlayMode"
+                                   Value="editPlayMode"
+                                   ValueChanged="OnEditPlayModeChangedAsync"
+                                   Label="Play mode"
+                                   Variant="Variant.Outlined">
+                            <MudSelectItem Value="TournamentMatchPlayMode.Offline">Offline</MudSelectItem>
+                            <MudSelectItem Value="TournamentMatchPlayMode.Online">Online</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+                @if (editPlayMode == TournamentMatchPlayMode.Online)
                 {
-                    if (IsOutcomeAvailableForSlot(other.TournamentMatchId, TemplateFeedOutcome.Winner, TemplateMatchSlot.B))
-                    {
-                        <MudSelectItem T="string" Value="@WinnerSlotValue(other.TournamentMatchId)">Winner of @DisplayName(other)</MudSelectItem>
-                    }
-                    if (IsOutcomeAvailableForSlot(other.TournamentMatchId, TemplateFeedOutcome.Loser, TemplateMatchSlot.B))
-                    {
-                        <MudSelectItem T="string" Value="@LoserSlotValue(other.TournamentMatchId)">Loser of @DisplayName(other)</MudSelectItem>
-                    }
+                    <MudTextField @bind-Value="editReplayUrl"
+                                  Label="@ReplayUrlFieldLabel"
+                                  Variant="Variant.Outlined"
+                                  Class="mb-3"
+                                  Immediate="true"
+                                  OnBlur="OnReplayUrlBlurAsync" />
                 }
-            </MudSelect>
-            @if (slotBValue == OpenSlotValue)
-            {
-                <MudTextField @bind-Value="editSlotBOpenLabel"
-                              Label="Slot B entrant text"
-                              Variant="Variant.Outlined"
-                              Class="mb-4"
-                              OnBlur="OnSlotBOpenLabelBlurAsync" />
-            }
-            else
-            {
-                <div class="mb-4" />
-            }
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Error"
-                       FullWidth="true"
-                       OnClick="DeleteMatchAsync">
-                Delete match
-            </MudButton>
+                <MudGrid Spacing="2" Class="mb-2">
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.body2" Class="match-editor-slot-label mb-1">Slot A</MudText>
+                        <MudSelect T="int?"
+                                   Label="Player"
+                                   Variant="Variant.Outlined"
+                                   Value="editSlotAUserId"
+                                   ValueChanged="OnEditSlotAUserChangedAsync"
+                                   ToStringFunc="FormatPlayerSelect"
+                                   Class="mb-2">
+                            <MudSelectItem T="int?" Value="@((int?)null)">—</MudSelectItem>
+                            @foreach (TournamentBracketParticipant player in AssignablePlayers(selectedMatch))
+                            {
+                                <MudSelectItem T="int?" Value="@player.UserId">@player.UserName</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudNumericField T="int?"
+                                         Value="editSlotAPoints"
+                                         ValueChanged="OnEditSlotAPointsChangedAsync"
+                                         Label="Points"
+                                         Variant="Variant.Outlined"
+                                         Min="0" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.body2" Class="match-editor-slot-label mb-1">Slot B</MudText>
+                        <MudSelect T="int?"
+                                   Label="Player"
+                                   Variant="Variant.Outlined"
+                                   Value="editSlotBUserId"
+                                   ValueChanged="OnEditSlotBUserChangedAsync"
+                                   ToStringFunc="FormatPlayerSelect"
+                                   Class="mb-2">
+                            <MudSelectItem T="int?" Value="@((int?)null)">—</MudSelectItem>
+                            @foreach (TournamentBracketParticipant player in AssignablePlayers(selectedMatch))
+                            {
+                                <MudSelectItem T="int?" Value="@player.UserId">@player.UserName</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudNumericField T="int?"
+                                         Value="editSlotBPoints"
+                                         ValueChanged="OnEditSlotBPointsChangedAsync"
+                                         Label="Points"
+                                         Variant="Variant.Outlined"
+                                         Min="0" />
+                    </MudItem>
+                </MudGrid>
+                <MudSelect T="TournamentMatchWinner"
+                           Value="editWinner"
+                           ValueChanged="OnEditWinnerChangedAsync"
+                           ToStringFunc="FormatWinnerOption"
+                           Label="Winner"
+                           Variant="Variant.Outlined">
+                    <MudSelectItem Value="TournamentMatchWinner.None">Neither</MudSelectItem>
+                    <MudSelectItem Value="TournamentMatchWinner.SlotA">@FormatWinnerOption(TournamentMatchWinner.SlotA)</MudSelectItem>
+                    <MudSelectItem Value="TournamentMatchWinner.SlotB">@FormatWinnerOption(TournamentMatchWinner.SlotB)</MudSelectItem>
+                </MudSelect>
+            </MudPaper>
+
+            <div class="match-editor-danger mt-2">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Error"
+                           FullWidth="true"
+                           OnClick="DeleteMatchAsync">
+                    Delete match
+                </MudButton>
+            </div>
         }
         @if (!string.IsNullOrEmpty(errorMessage))
         {
@@ -217,6 +246,9 @@
     private int? editSlotBPoints;
     private TournamentMatchWinner editWinner = TournamentMatchWinner.None;
     private string? errorMessage;
+
+    private bool IsFinaleMatch =>
+        graph is not null && graph.Tournament.FinaleTournamentMatchId == TournamentMatchId;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -423,6 +455,42 @@
 
     private TournamentMatch? RefreshMatch(TournamentMatch match) =>
         graph?.Matches.FirstOrDefault(m => m.TournamentMatchId == match.TournamentMatchId);
+
+    private async Task OnFinaleMatchToggledAsync(bool isFinale)
+    {
+        if (graph is null)
+        {
+            return;
+        }
+
+        int? finaleMatchId;
+        if (isFinale)
+        {
+            finaleMatchId = TournamentMatchId;
+        }
+        else
+        {
+            if (graph.Tournament.FinaleTournamentMatchId != TournamentMatchId)
+            {
+                return;
+            }
+
+            finaleMatchId = null;
+        }
+
+        Result<Tournament> result = await BracketStore.SetFinaleMatchAsync(
+            TournamentId,
+            finaleMatchId,
+            graph.Tournament.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            errorMessage = result.Error ?? "Could not update finale match.";
+            return;
+        }
+
+        await LoadGraphAsync();
+    }
 
     private async Task SaveMatchNameForAsync(TournamentMatch match, string name)
     {

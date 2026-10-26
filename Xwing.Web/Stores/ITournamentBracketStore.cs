@@ -71,4 +71,10 @@ public interface ITournamentBracketStore
         bool actingUserIsAdmin,
         byte[] rowVersion,
         CancellationToken cancellationToken);
+
+    Task<Result<Tournament>> SetFinaleMatchAsync(
+        int tournamentId,
+        int? tournamentMatchId,
+        byte[] rowVersion,
+        CancellationToken cancellationToken);
 }

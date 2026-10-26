@@ -80,6 +80,15 @@
                                      Class="tournament-list-card-meta-icon" />
                             @item.ParticipantCount
                         </span>
+                        @if (!string.IsNullOrEmpty(item.WinnerUserName))
+                        {
+                            <span class="tournament-list-card-meta-item">
+                                <MudIcon Icon="@Icons.Material.Filled.EmojiEvents"
+                                         Size="Size.Small"
+                                         Class="tournament-list-card-meta-icon" />
+                                @item.WinnerUserName
+                            </span>
+                        }
                         <span class="tournament-list-card-meta-item tournament-list-card-dates">
                             @if (IsSameUtcCalendarDay(item.Tournament.StartDateUtc, item.Tournament.EndDateUtc))
                             {
@@ -113,6 +122,7 @@
             <MudTh>Status</MudTh>
             <MudTh><MudTableSortLabel T="TournamentListItem" SortLabel="Start" InitialDirection="SortDirection.Ascending">Start</MudTableSortLabel></MudTh>
             <MudTh><MudTableSortLabel T="TournamentListItem" SortLabel="End">End</MudTableSortLabel></MudTh>
+            <MudTh>Winner</MudTh>
             <MudTh>Results</MudTh>
         </HeaderContent>
         <RowTemplate>
@@ -135,6 +145,7 @@
             </MudTd>
             <MudTd DataLabel="Start">@FormatDate(context.Tournament.StartDateUtc)</MudTd>
             <MudTd DataLabel="End">@FormatDate(context.Tournament.EndDateUtc)</MudTd>
+            <MudTd DataLabel="Winner">@(context.WinnerUserName ?? "—")</MudTd>
             <MudTd DataLabel="Results">
                 <MudLink Href="@($"/tournaments/{context.Tournament.TournamentId}/results")" Underline="Underline.Hover">Results</MudLink>
             </MudTd>

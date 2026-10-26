@@ -56,6 +56,14 @@ public sealed class XwingDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.TournamentTemplateId)
                 .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(e => e.WinnerUser)
+                .WithMany()
+                .HasForeignKey(e => e.WinnerUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(e => e.FinaleTournamentMatch)
+                .WithMany()
+                .HasForeignKey(e => e.FinaleTournamentMatchId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
         modelBuilder.Entity<User>(entity =>
         {

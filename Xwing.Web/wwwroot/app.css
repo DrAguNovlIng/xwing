@@ -520,6 +520,39 @@ h1:focus {
     overflow-y: auto;
 }
 
+.match-editor-section {
+    border-left-width: 4px;
+    border-left-style: solid;
+    border-left-color: var(--mud-palette-lines-default);
+}
+
+.match-editor-section--match {
+    border-left-color: var(--mud-palette-text-secondary);
+}
+
+.match-editor-section--bracket {
+    border-left-color: var(--mud-palette-info);
+}
+
+.match-editor-section--result {
+    border-left-color: var(--mud-palette-success);
+}
+
+.match-editor-section-heading {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.match-editor-slot-label {
+    font-weight: 600;
+    color: var(--mud-palette-text-secondary);
+}
+
+.match-editor-danger {
+    padding-top: 0.25rem;
+    border-top: 1px solid var(--mud-palette-lines-default);
+}
+
 @media (max-width: 600px) {
     .match-editor-dialog {
         width: 100%;

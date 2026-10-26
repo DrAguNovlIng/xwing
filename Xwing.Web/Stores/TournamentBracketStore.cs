@@ -411,9 +411,56 @@ public sealed class TournamentBracketStore : ITournamentBracketStore
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
         context.TournamentMatchFeeds.RemoveRange(relatedFeeds);
+        Tournament? tournamentWithFinale = await context.Tournaments
+            .SingleOrDefaultAsync(
+                t => t.TournamentId == match.TournamentId && t.FinaleTournamentMatchId == tournamentMatchId,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (tournamentWithFinale is not null)
+        {
+            tournamentWithFinale.FinaleTournamentMatchId = null;
+        }
+
         context.Entry(match).Property(e => e.RowVersion).OriginalValue = rowVersion;
         context.TournamentMatches.Remove(match);
         return await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<Result<Tournament>> SetFinaleMatchAsync(
+        int tournamentId,
+        int? tournamentMatchId,
+        byte[] rowVersion,
+        CancellationToken cancellationToken)
+    {
+        await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        Tournament? tournament = await context.Tournaments
+            .SingleOrDefaultAsync(t => t.TournamentId == tournamentId, cancellationToken)
+            .ConfigureAwait(false);
+        if (tournament is null)
+        {
+            return Result.Fail<Tournament>("Tournament not found.");
+        }
+
+        if (tournamentMatchId is int matchId)
+        {
+            bool matchExists = await context.TournamentMatches
+                .AnyAsync(m => m.TournamentMatchId == matchId && m.TournamentId == tournamentId, cancellationToken)
+                .ConfigureAwait(false);
+            if (!matchExists)
+            {
+                return Result.Fail<Tournament>("Match not found.");
+            }
+        }
+
+        tournament.FinaleTournamentMatchId = tournamentMatchId;
+        context.Entry(tournament).Property(t => t.RowVersion).OriginalValue = rowVersion;
+        Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
+        if (!saveResult.IsSuccess)
+        {
+            return Result.Fail<Tournament>(saveResult.Error!);
+        }
+
+        return Result.Ok(tournament);
     }
 
     public async Task<Result> SetSlotFeedAsync(
@@ -636,6 +683,16 @@ public sealed class TournamentBracketStore : ITournamentBracketStore
             {
                 return Result.Fail<TournamentMatch>(propagation.Error!);
             }
+        }
+
+        Tournament? tournament = await context.Tournaments
+            .SingleOrDefaultAsync(t => t.TournamentId == tournamentId, cancellationToken)
+            .ConfigureAwait(false);
+        if (tournament is not null && tournament.FinaleTournamentMatchId == tournamentMatchId)
+        {
+            tournament.WinnerUserId = update.Winner == TournamentMatchWinner.None
+                ? null
+                : TournamentChampion.GetWinnerUserId(match);
         }
 
         context.Entry(match).Property(e => e.RowVersion).OriginalValue = rowVersion;

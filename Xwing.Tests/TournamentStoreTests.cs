@@ -1112,4 +1112,56 @@ public sealed class TournamentStoreTests
             ownerRow.SquadUrl.ShouldBeNull();
         }
     }
+
+    [Fact]
+    public async Task SetWinnerAsyncShouldRequireParticipantAndAppearInList()
+    {
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<UserAccount> player = await stores.Users.CreateAsync(
+                "winner",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+                "Champion event",
+                DefaultStart,
+                DefaultEnd,
+                false,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> reject = await stores.Tournaments.SetWinnerAsync(
+                tournament.Value!.TournamentId,
+                player.Value!.UserId,
+                tournament.Value.RowVersion,
+                TestContext.Current.CancellationToken);
+            reject.IsSuccess.ShouldBeFalse();
+            await stores.Tournaments.JoinAsync(
+                tournament.Value.TournamentId,
+                player.Value.UserId,
+                null,
+                TestContext.Current.CancellationToken);
+            Tournament? reloaded = await stores.Tournaments.GetAsync(
+                tournament.Value.TournamentId,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> setWinner = await stores.Tournaments.SetWinnerAsync(
+                tournament.Value.TournamentId,
+                player.Value.UserId,
+                reloaded!.RowVersion,
+                TestContext.Current.CancellationToken);
+            setWinner.IsSuccess.ShouldBeTrue();
+            IReadOnlyList<TournamentListItem> list = await stores.Tournaments.ListAsync(
+                TestContext.Current.CancellationToken);
+            list.Single().WinnerUserName.ShouldBe("winner");
+            Result<Tournament> clear = await stores.Tournaments.SetWinnerAsync(
+                tournament.Value.TournamentId,
+                null,
+                setWinner.Value!.RowVersion,
+                TestContext.Current.CancellationToken);
+            clear.IsSuccess.ShouldBeTrue();
+            clear.Value!.WinnerUserId.ShouldBeNull();
+        }
+    }
 }

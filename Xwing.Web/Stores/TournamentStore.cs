@@ -151,6 +151,43 @@ public sealed class TournamentStore : ITournamentStore
         return Result.Ok(tournament);
     }
 
+    public async Task<Result<Tournament>> SetWinnerAsync(
+        int tournamentId,
+        int? userId,
+        byte[] rowVersion,
+        CancellationToken cancellationToken)
+    {
+        await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        Tournament? tournament = await context.Tournaments
+            .SingleOrDefaultAsync(t => t.TournamentId == tournamentId, cancellationToken)
+            .ConfigureAwait(false);
+        if (tournament is null)
+        {
+            return Result.Fail<Tournament>("Tournament not found.");
+        }
+
+        if (userId is int winnerUserId)
+        {
+            bool isParticipant = await context.TournamentParticipants
+                .AnyAsync(p => p.TournamentId == tournamentId && p.UserId == winnerUserId, cancellationToken)
+                .ConfigureAwait(false);
+            if (!isParticipant)
+            {
+                return Result.Fail<Tournament>("Winner must be a tournament participant.");
+            }
+        }
+
+        tournament.WinnerUserId = userId;
+        context.Entry(tournament).Property(t => t.RowVersion).OriginalValue = rowVersion;
+        Result saveResult = await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
+        if (!saveResult.IsSuccess)
+        {
+            return Result.Fail<Tournament>(saveResult.Error!);
+        }
+
+        return Result.Ok(tournament);
+    }
+
     public async Task<Result> DeleteAsync(int tournamentId, CancellationToken cancellationToken)
     {
         await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
@@ -568,18 +605,36 @@ public sealed class TournamentStore : ITournamentStore
             currentUserParticipants = rows.ToDictionary(p => p.TournamentId);
         }
 
+        int[] winnerUserIds = tournaments
+            .Select(t => t.WinnerUserId)
+            .Where(id => id is not null)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToArray();
+        Dictionary<int, string> winnerNames = winnerUserIds.Length == 0
+            ? []
+            : await context.Users
+                .AsNoTracking()
+                .Where(u => winnerUserIds.Contains(u.UserId))
+                .ToDictionaryAsync(u => u.UserId, u => u.UserName, cancellationToken)
+                .ConfigureAwait(false);
+
         return tournaments
             .Select(t =>
             {
                 bool joined = currentUserParticipants.ContainsKey(t.TournamentId);
                 bool hasSquad = joined &&
                                 ParticipantHasSquad(currentUserParticipants[t.TournamentId]);
+                string? winnerUserName = t.WinnerUserId is int winnerId
+                    ? winnerNames.GetValueOrDefault(winnerId)
+                    : null;
                 return new TournamentListItem
                 {
                     Tournament = t,
                     ParticipantCount = counts.GetValueOrDefault(t.TournamentId),
                     CurrentUserJoined = joined,
                     CurrentUserHasSquad = hasSquad,
+                    WinnerUserName = winnerUserName,
                 };
             })
             .ToList();
@@ -634,6 +689,7 @@ public sealed record TournamentListItem
     public int ParticipantCount { get; init; }
     public bool CurrentUserJoined { get; init; }
     public bool CurrentUserHasSquad { get; init; }
+    public string? WinnerUserName { get; init; }
 }
 
 public sealed record TournamentMember

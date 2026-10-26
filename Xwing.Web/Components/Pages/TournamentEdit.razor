@@ -9,6 +9,7 @@
 @using Xwing.Web.Models
 @using Xwing.Web.Stores
 @inject ITournamentBracketStore BracketStore
+@inject ITournamentStore TournamentStore
 @inject ITournamentTemplateStore TemplateStore
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
@@ -77,6 +78,32 @@
                          Label="Enable dragging (move matches, resize rounds)"
                          Color="Color.Primary"
                          Class="bracket-inline-action bracket-inline-action--checkbox" />
+        </MudStack>
+        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Class="mb-2 bracket-inline-controls bracket-editor-toolbar">
+            <MudSelect T="int?"
+                       Label="Finale match"
+                       Variant="Variant.Outlined"
+                       Value="graph.Tournament.FinaleTournamentMatchId"
+                       ValueChanged="OnFinaleMatchChangedAsync"
+                       Style="min-width: 14rem;">
+                <MudSelectItem T="int?" Value="@((int?)null)">—</MudSelectItem>
+                @foreach (TournamentMatch finaleOption in graph.Matches)
+                {
+                    <MudSelectItem T="int?" Value="@finaleOption.TournamentMatchId">@DisplayName(finaleOption)</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="int?"
+                       Label="Champion"
+                       Variant="Variant.Outlined"
+                       Value="graph.Tournament.WinnerUserId"
+                       ValueChanged="OnWinnerUserChangedAsync"
+                       Style="min-width: 14rem;">
+                <MudSelectItem T="int?" Value="@((int?)null)">—</MudSelectItem>
+                @foreach (TournamentBracketParticipant participant in graph.Participants.Where(p => p.IsActive))
+                {
+                    <MudSelectItem T="int?" Value="@participant.UserId">@participant.UserName</MudSelectItem>
+                }
+            </MudSelect>
         </MudStack>
     }
     @if (!string.IsNullOrEmpty(statusMessage))
@@ -178,6 +205,10 @@
                                 <MudIcon Icon="@Icons.Material.Filled.DragIndicator" Size="Size.Small" />
                                 <div class="template-match-box-header">
                                     <MudText Typo="Typo.subtitle2">@DisplayName(match)</MudText>
+                                    @if (graph.Tournament.FinaleTournamentMatchId == match.TournamentMatchId)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">Finale</MudChip>
+                                    }
                                     @if (match.PlayMode == TournamentMatchPlayMode.Online)
                                     {
                                         <MudChip T="string" Size="Size.Small" Color="Color.Info">Online</MudChip>
@@ -927,6 +958,48 @@
     {
         statusMessage = message;
         statusSeverity = severity;
+    }
+
+    private async Task OnFinaleMatchChangedAsync(int? tournamentMatchId)
+    {
+        if (graph is null)
+        {
+            return;
+        }
+
+        Result<Tournament> result = await BracketStore.SetFinaleMatchAsync(
+            TournamentId,
+            tournamentMatchId,
+            graph.Tournament.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Could not set finale match.", Severity.Error);
+            return;
+        }
+
+        await LoadGraphAsync();
+    }
+
+    private async Task OnWinnerUserChangedAsync(int? userId)
+    {
+        if (graph is null)
+        {
+            return;
+        }
+
+        Result<Tournament> result = await TournamentStore.SetWinnerAsync(
+            TournamentId,
+            userId,
+            graph.Tournament.RowVersion,
+            CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            ShowStatus(result.Error ?? "Could not set champion.", Severity.Error);
+            return;
+        }
+
+        await LoadGraphAsync();
     }
 
 }

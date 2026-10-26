@@ -167,6 +167,9 @@ namespace Xwing.Web.Data.Migrations
                     b.Property<DateTimeOffset>("EndDateUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<int?>("FinaleTournamentMatchId")
+                        .HasColumnType("int");
+
                     b.Property<string>("FormatDescription")
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
@@ -209,9 +212,16 @@ namespace Xwing.Web.Data.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
 
+                    b.Property<int?>("WinnerUserId")
+                        .HasColumnType("int");
+
                     b.HasKey("TournamentId");
 
+                    b.HasIndex("FinaleTournamentMatchId");
+
                     b.HasIndex("TournamentTemplateId");
+
+                    b.HasIndex("WinnerUserId");
 
                     b.ToTable("Tournaments", (string)null);
                 });
@@ -562,12 +572,26 @@ namespace Xwing.Web.Data.Migrations
 
             modelBuilder.Entity("Xwing.Web.Data.Tournament", b =>
                 {
+                    b.HasOne("Xwing.Web.Data.TournamentMatch", "FinaleTournamentMatch")
+                        .WithMany()
+                        .HasForeignKey("FinaleTournamentMatchId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("Xwing.Web.Data.TournamentTemplate", "TournamentTemplate")
                         .WithMany()
                         .HasForeignKey("TournamentTemplateId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Xwing.Web.Data.User", "WinnerUser")
+                        .WithMany()
+                        .HasForeignKey("WinnerUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("FinaleTournamentMatch");
+
                     b.Navigation("TournamentTemplate");
+
+                    b.Navigation("WinnerUser");
                 });
 
             modelBuilder.Entity("Xwing.Web.Data.TournamentCanvasRound", b =>
