@@ -22,11 +22,11 @@
             @if (isSignedIn)
             {
                 <MudNavLink Href="/tournaments" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.EmojiEvents">Tournaments</MudNavLink>
-                <MudNavLink Href="/print-squads" Icon="@Icons.Material.Filled.Print">Print squads</MudNavLink>
             }
 
             @if (isAdmin)
             {
+                <MudNavLink Href="/print-squads" Icon="@Icons.Material.Filled.Print">Print squads</MudNavLink>
                 <MudNavLink Href="/tournaments/manage" Icon="@Icons.Material.Filled.Edit">Manage tournaments</MudNavLink>
                 <MudNavLink Href="/tournament-templates" Icon="@Icons.Material.Filled.AccountTree">Tournament templates</MudNavLink>
                 <MudNavLink Href="/users" Icon="@Icons.Material.Filled.People">Users</MudNavLink>

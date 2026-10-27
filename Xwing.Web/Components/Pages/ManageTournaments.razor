@@ -6,9 +6,11 @@
 @using Xwing.Web.Components.Dialogs
 @using Xwing.Web.Data
 @using Xwing.Web.Models
+@using Xwing.Web.Stores
 @inject ITournamentStore TournamentStore
-
 @inject IDialogService DialogService
+@inject TimeProvider TimeProvider
+
 <PageTitle>Manage tournaments</PageTitle>
 
 <MudToolBar Gutters="false" Class="mb-4" WrapContent="true">
@@ -25,28 +27,63 @@
 {
     <MudAlert Severity="@statusSeverity" Class="mb-4" Dense="true">@statusMessage</MudAlert>
 }
-<MudTable Items="tournaments" Hover="true" Dense="true">
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="4">
+        <MudTextField Value="nameSearch"
+                      ValueChanged="@(async (string v) => await OnNameSearchChangedAsync(v))"
+                      Label="Search by name"
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true"
+                      DebounceInterval="300" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="4">
+        <MudSelect T="TournamentWhenFilter"
+                   Value="whenFilter"
+                   ValueChanged="@(async (TournamentWhenFilter v) => await OnWhenFilterChangedAsync(v))"
+                   Label="Show"
+                   Variant="Variant.Outlined">
+            <MudSelectItem T="TournamentWhenFilter" Value="TournamentWhenFilter.All">All</MudSelectItem>
+            <MudSelectItem T="TournamentWhenFilter" Value="TournamentWhenFilter.Active">Active</MudSelectItem>
+            <MudSelectItem T="TournamentWhenFilter" Value="TournamentWhenFilter.Past">Past</MudSelectItem>
+        </MudSelect>
+    </MudItem>
+</MudGrid>
+<MudTable @ref="table"
+          ServerData="LoadServerDataAsync"
+          Hover="true"
+          Dense="true"
+          Breakpoint="Breakpoint.None"
+          SortLabel="Sort">
     <HeaderContent>
-        <MudTh>Name</MudTh>
+        <MudTh><MudTableSortLabel T="TournamentListItem" SortLabel="Name">Name</MudTableSortLabel></MudTh>
         <MudTh>Players</MudTh>
-        <MudTh>Start</MudTh>
-        <MudTh>End</MudTh>
+        <MudTh>Status</MudTh>
+        <MudTh><MudTableSortLabel T="TournamentListItem" SortLabel="Start" InitialDirection="SortDirection.Ascending">Start</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="TournamentListItem" SortLabel="End">End</MudTableSortLabel></MudTh>
         <MudTh>Winner</MudTh>
         <MudTh Style="width: 16rem;">Actions</MudTh>
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="Name">@context.Tournament.Name</MudTd>
         <MudTd DataLabel="Players">@context.ParticipantCount</MudTd>
+        <MudTd DataLabel="Status">
+            <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Tournament)">@GetStatusLabel(context.Tournament)</MudChip>
+        </MudTd>
         <MudTd DataLabel="Start">@FormatDate(context.Tournament.StartDateUtc)</MudTd>
         <MudTd DataLabel="End">@FormatDate(context.Tournament.EndDateUtc)</MudTd>
         <MudTd DataLabel="Winner">@(context.WinnerUserName ?? "—")</MudTd>
-        <MudTd>
+        <MudTd DataLabel="Actions">
             <MudButton Size="Size.Small" Variant="Variant.Text" Href="@($"/tournaments/{context.Tournament.TournamentId}")">Open</MudButton>
             <MudButton Size="Size.Small" Variant="Variant.Text" Href="@($"/tournaments/{context.Tournament.TournamentId}/edit")">Edit results</MudButton>
             <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => OpenEditDialogAsync(context.Tournament))">Edit</MudButton>
             <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error" OnClick="@(() => DeleteAsync(context.Tournament.TournamentId))">Delete</MudButton>
         </MudTd>
     </RowTemplate>
+    <NoRecordsContent>
+        <MudText>No tournaments match your search.</MudText>
+    </NoRecordsContent>
 </MudTable>
 
 @code {
@@ -56,17 +93,58 @@
         MaxWidth = MaxWidth.Small,
         FullWidth = true,
     };
-    private IReadOnlyList<TournamentListItem> tournaments = [];
+    private MudTable<TournamentListItem>? table;
+    private string nameSearch = string.Empty;
+    private TournamentWhenFilter whenFilter = TournamentWhenFilter.Active;
+    private DateTimeOffset todayUtc;
     private string? statusMessage;
     private Severity statusSeverity = Severity.Info;
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        await ReloadAsync();
+        todayUtc = TournamentSchedule.TodayUtc(TimeProvider);
     }
 
-    private async Task ReloadAsync()
+    private async Task<TableData<TournamentListItem>> LoadServerDataAsync(TableState state, CancellationToken cancellationToken)
     {
-        tournaments = await TournamentStore.ListAsync(CancellationToken.None);
+        IReadOnlyList<TournamentListItem> items = await FetchListItemsAsync(state, cancellationToken);
+        return new TableData<TournamentListItem>
+        {
+            Items = items,
+            TotalItems = items.Count,
+        };
+    }
+
+    private async Task<IReadOnlyList<TournamentListItem>> FetchListItemsAsync(TableState state, CancellationToken cancellationToken)
+    {
+        todayUtc = TournamentSchedule.TodayUtc(TimeProvider);
+        var query = new TournamentSearchQuery
+        {
+            NameSearch = string.IsNullOrWhiteSpace(nameSearch) ? null : nameSearch,
+            WhenFilter = whenFilter,
+            SortField = MapSortField(state.SortLabel),
+            SortDescending = state.SortDirection == SortDirection.Descending,
+        };
+        return await TournamentStore.SearchAsync(query, cancellationToken);
+    }
+
+    private async Task OnNameSearchChangedAsync(string value)
+    {
+        nameSearch = value;
+        await ReloadListAsync();
+    }
+
+    private async Task OnWhenFilterChangedAsync(TournamentWhenFilter value)
+    {
+        whenFilter = value;
+        await ReloadListAsync();
+    }
+
+    private async Task ReloadListAsync()
+    {
+        if (table is not null)
+        {
+            await table.ReloadServerData();
+        }
     }
 
     private async Task OpenCreateDialogAsync()
@@ -80,7 +158,7 @@
             return;
         }
         ShowStatus("Tournament created.", Severity.Success);
-        await ReloadAsync();
+        await ReloadListAsync();
     }
 
     private async Task OpenEditDialogAsync(Tournament tournament)
@@ -99,7 +177,7 @@
             return;
         }
         ShowStatus("Tournament updated.", Severity.Success);
-        await ReloadAsync();
+        await ReloadListAsync();
     }
 
     private async Task DeleteAsync(int tournamentId)
@@ -111,11 +189,39 @@
             return;
         }
         ShowStatus("Tournament deleted.", Severity.Success);
-        await ReloadAsync();
+        await ReloadListAsync();
     }
+
+    private static TournamentSortField MapSortField(string? sortLabel) =>
+        sortLabel switch
+        {
+            "Name" => TournamentSortField.Name,
+            "End" => TournamentSortField.EndDate,
+            _ => TournamentSortField.StartDate,
+        };
+
+    private TournamentLifecycleStatus GetLifecycleStatus(Tournament tournament) =>
+        TournamentSchedule.GetStatus(tournament, todayUtc);
+
+    private string GetStatusLabel(Tournament tournament) =>
+        GetLifecycleStatus(tournament) switch
+        {
+            TournamentLifecycleStatus.Upcoming => "Upcoming",
+            TournamentLifecycleStatus.InProgress => "In progress",
+            _ => "Past",
+        };
+
+    private Color GetStatusColor(Tournament tournament) =>
+        GetLifecycleStatus(tournament) switch
+        {
+            TournamentLifecycleStatus.Upcoming => Color.Info,
+            TournamentLifecycleStatus.InProgress => Color.Success,
+            _ => Color.Error,
+        };
 
     private static string FormatDate(DateTimeOffset value) =>
         value.UtcDateTime.ToString("d", CultureInfo.CurrentCulture);
+
     private void ShowStatus(string message, Severity severity)
     {
         statusMessage = message;

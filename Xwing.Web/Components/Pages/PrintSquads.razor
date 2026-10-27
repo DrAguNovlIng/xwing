@@ -1,16 +1,13 @@
 @page "/print-squads"
-@attribute [Authorize]
+@attribute [Authorize(Roles = UserRoles.Admin)]
 
 @using System.Globalization
-@using System.Security.Claims
 @using System.Text.Json
-@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.WebUtilities
 @using Microsoft.JSInterop
 @using Xwing.Web.Data
 @using Xwing.Web.Stores
 @inject ITournamentStore TournamentStore
-@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JsRuntime
 
@@ -134,15 +131,12 @@ else
     private int? serializationVersion;
     private string? ruleset;
     private string? versionTag;
-    private bool isAdmin;
     private IJSObjectReference? clipboardModule;
 
     private bool CanCopy => !string.IsNullOrEmpty(combinedJson);
 
     protected override async Task OnInitializedAsync()
     {
-        AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        isAdmin = authState.User.IsInRole(UserRoles.Admin);
         await TryLoadTournamentSquadsAsync();
         RebuildCombined();
     }
@@ -162,11 +156,6 @@ else
         Uri uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
         if (!QueryHelpers.ParseQuery(uri.Query).TryGetValue("tournamentId", out var tournamentIdValues) ||
             !int.TryParse(tournamentIdValues.FirstOrDefault(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int tournamentId))
-        {
-            return;
-        }
-
-        if (!isAdmin)
         {
             return;
         }
