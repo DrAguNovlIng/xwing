@@ -61,7 +61,6 @@ public sealed class MultiFactionXwsTests
         parsed.IsSuccess.ShouldBeTrue();
         Result<string> built = MultiFactionXws.BuildCombined(
             parsed.Value!.Pilots,
-            parsed.Value.SerializationVersion,
             parsed.Value.Ruleset,
             parsed.Value.VersionTag,
             "Unnamed Squadron");
@@ -70,25 +69,20 @@ public sealed class MultiFactionXwsTests
         JsonElement root = document.RootElement;
         root.TryGetProperty("faction", out _).ShouldBeFalse();
         root.TryGetProperty("obstacles", out _).ShouldBeFalse();
+        root.TryGetProperty("vendor", out _).ShouldBeFalse();
         root.GetProperty("points").GetInt32().ShouldBe(17);
         root.GetProperty("ruleset").GetString().ShouldBe("XWA");
         root.GetProperty("pilots").GetArrayLength().ShouldBe(2);
-        string link = root.GetProperty("vendor").GetProperty("yasb").GetProperty("link").GetString()!;
-        link.ShouldContain("f=All");
-        link.ShouldContain("obs=");
-        link.ShouldContain("76XWWW134WWW313W");
-        link.ShouldContain("484XWW137WWWWW");
     }
 
     [Fact]
-    public void BuildCombinedShouldDropRemovedShipFromLink()
+    public void BuildCombinedShouldDropRemovedShip()
     {
         Result<ParsedXwsSquad> parsed = MultiFactionXws.Parse(SampleMultiFactionXws);
         parsed.IsSuccess.ShouldBeTrue();
         ParsedXwsPilot kept = parsed.Value!.Pilots[0];
         Result<string> built = MultiFactionXws.BuildCombined(
             [kept],
-            parsed.Value.SerializationVersion,
             parsed.Value.Ruleset,
             parsed.Value.VersionTag,
             "Unnamed Squadron");
@@ -96,9 +90,6 @@ public sealed class MultiFactionXwsTests
         using JsonDocument document = JsonDocument.Parse(built.Value!);
         document.RootElement.GetProperty("pilots").GetArrayLength().ShouldBe(1);
         document.RootElement.GetProperty("points").GetInt32().ShouldBe(10);
-        string link = document.RootElement.GetProperty("vendor").GetProperty("yasb").GetProperty("link").GetString()!;
-        link.ShouldContain("76XWWW134WWW313W");
-        link.ShouldNotContain("484XWW137WWWWW");
     }
 
     [Fact]

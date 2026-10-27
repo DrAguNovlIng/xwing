@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -9,10 +8,6 @@ namespace Xwing.Web.Stores;
 
 public static partial class MultiFactionXws
 {
-    private const string YasbBuilderName = "YASB - X-Wing 2.5 XWA";
-    [SuppressMessage("Sonar", "S1075:URIs should not be hardcoded", Justification = "YASB builder base URL is fixed for XWS export.")]
-    private const string YasbBuilderUrl = "https://yasb.app/";
-
     public static Result<ParsedXwsSquad> Parse(string jsonText, string? sourceLabel = null)
     {
         if (string.IsNullOrWhiteSpace(jsonText))
@@ -118,7 +113,6 @@ public static partial class MultiFactionXws
 
     public static Result<string> BuildCombined(
         IReadOnlyList<ParsedXwsPilot> includedPilots,
-        int serializationVersion,
         string? ruleset,
         string? versionTag,
         string squadName)
@@ -131,10 +125,6 @@ public static partial class MultiFactionXws
 
         string trimmedName = string.IsNullOrWhiteSpace(squadName) ? "Unnamed Squadron" : squadName.Trim();
         int totalPoints = includedPilots.Sum(p => p.Points);
-        string serializedPayload = string.Join(
-            'Y',
-            includedPilots.Select(p => p.SerializedChunk));
-        string link = BuildYasbLink(serializationVersion, serializedPayload, trimmedName);
 
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = false }))
@@ -151,15 +141,6 @@ public static partial class MultiFactionXws
 
             writer.WriteEndArray();
             writer.WriteNumber("points", totalPoints);
-            writer.WritePropertyName("vendor");
-            writer.WriteStartObject();
-            writer.WritePropertyName("yasb");
-            writer.WriteStartObject();
-            writer.WriteString("builder", YasbBuilderName);
-            writer.WriteString("builder_url", YasbBuilderUrl);
-            writer.WriteString("link", link);
-            writer.WriteEndObject();
-            writer.WriteEndObject();
             if (!string.IsNullOrWhiteSpace(versionTag))
             {
                 writer.WriteString("version", versionTag);
@@ -174,12 +155,6 @@ public static partial class MultiFactionXws
         }
 
         return Result.Ok(Encoding.UTF8.GetString(stream.ToArray()));
-    }
-
-    private static string BuildYasbLink(int serializationVersion, string serializedPayload, string squadName)
-    {
-        string d = "v" + serializationVersion.ToString(CultureInfo.InvariantCulture) + "ZeZ100Z" + serializedPayload;
-        return YasbBuilderUrl + "?f=All&d=" + Uri.EscapeDataString(d) + "&sn=" + Uri.EscapeDataString(squadName) + "&obs=";
     }
 
     private static Result<(int SerializationVersion, IReadOnlyList<string> ShipChunks)> ParseSerializedShipsFromUrl(
