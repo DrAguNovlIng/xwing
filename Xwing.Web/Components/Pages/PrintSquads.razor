@@ -1,0 +1,415 @@
+@page "/print-squads"
+@attribute [Authorize]
+
+@using System.Globalization
+@using System.Security.Claims
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.JSInterop
+@using Xwing.Web.Data
+@using Xwing.Web.Stores
+@inject ITournamentStore TournamentStore
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JsRuntime
+
+<PageTitle>Print squads</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Print squads</MudText>
+<MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">
+    Combine several XWS lists into one multi-faction list for printing in YASB. Obstacles are omitted.
+</MudText>
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <MudAlert Severity="@statusSeverity" Class="mb-4" Dense="true">@statusMessage</MudAlert>
+}
+
+@if (missingStoredSquads.Count > 0)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4" Dense="true">
+        These participants have no stored XWS on file. Paste their squad JSON below:
+        @string.Join(", ", missingStoredSquads)
+    </MudAlert>
+}
+
+<MudTextField @bind-Value="squadName"
+              @bind-Value:after="RebuildCombined"
+              Label="Combined squad name"
+              Variant="Variant.Outlined"
+              Class="mb-4"
+              Style="max-width: 28rem;" />
+
+<MudTextField @bind-Value="pasteJson"
+              Label="Paste XWS JSON"
+              Variant="Variant.Outlined"
+              Lines="6"
+              Class="mb-2"
+              Sizing="InputSizing.Auto" />
+<MudButton Variant="Variant.Filled"
+           Color="Color.Primary"
+           Class="mb-6"
+           Disabled="string.IsNullOrWhiteSpace(pasteJson)"
+           OnClick="AddPastedSquadAsync">
+    Add squad
+</MudButton>
+
+@if (loadedSquads.Count == 0)
+{
+    <MudText Class="mb-4">No squads added yet.</MudText>
+}
+else
+{
+    <MudStack Spacing="3" Class="mb-6">
+        @foreach (LoadedSquad squad in loadedSquads)
+        {
+            <MudPaper Class="pa-3" Outlined="true" Elevation="0">
+                <div class="participant-header mb-2">
+                    <MudText Typo="Typo.subtitle1">@squad.Label</MudText>
+                    <MudButton Size="Size.Small"
+                               Variant="Variant.Text"
+                               Color="Color.Error"
+                               OnClick="@(() => RemoveSquad(squad.Key))">
+                        Remove squad
+                    </MudButton>
+                </div>
+                <div class="squad-pilot-rows">
+                    @foreach (LoadedPilot pilot in squad.Pilots)
+                    {
+                        if (!pilot.Included)
+                        {
+                            continue;
+                        }
+
+                        string shipSlug = XwaSquad.GetShipIconSlug(pilot.ShipId);
+                        <div class="squad-pilot-row">
+                            <i class="@($"xwing-miniatures-ship xwing-miniatures-ship-{shipSlug}")"
+                               aria-hidden="true"></i>
+                            <MudText Typo="Typo.body2">@pilot.PilotLabel</MudText>
+                            <MudSpacer />
+                            <MudButton Size="Size.Small"
+                                       Variant="Variant.Text"
+                                       OnClick="@(() => RemovePilot(pilot.Key))">
+                                Remove ship
+                            </MudButton>
+                        </div>
+                    }
+                </div>
+            </MudPaper>
+        }
+    </MudStack>
+}
+
+<MudText Typo="Typo.h6" Class="mb-2">Combined XWS</MudText>
+<MudTextField Value="@combinedJson"
+              Label="Output"
+              Variant="Variant.Outlined"
+              Lines="10"
+              ReadOnly="true"
+              Class="mb-2"
+              Sizing="InputSizing.Auto" />
+<MudStack Row="true" Spacing="2" Class="mb-4">
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               Disabled="@(!CanCopy)"
+               OnClick="CopyCombinedAsync">
+        Copy XWS
+    </MudButton>
+    @if (!string.IsNullOrEmpty(combinedJson))
+    {
+        <MudButton Variant="Variant.Outlined"
+                   Href="@yasbLink"
+                   Target="_blank">
+            Open in YASB
+        </MudButton>
+    }
+</MudStack>
+
+@code {
+    private readonly List<LoadedSquad> loadedSquads = [];
+    private readonly List<string> missingStoredSquads = [];
+    private string pasteJson = string.Empty;
+    private string squadName = "Unnamed Squadron";
+    private string combinedJson = string.Empty;
+    private string? yasbLink;
+    private string? statusMessage;
+    private Severity statusSeverity = Severity.Info;
+    private int? serializationVersion;
+    private string? ruleset;
+    private string? versionTag;
+    private bool isAdmin;
+    private IJSObjectReference? clipboardModule;
+
+    private bool CanCopy => !string.IsNullOrEmpty(combinedJson);
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthenticationState authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAdmin = authState.User.IsInRole(UserRoles.Admin);
+        await TryLoadTournamentSquadsAsync();
+        RebuildCombined();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            clipboardModule = await JsRuntime.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./clipboard.js");
+        }
+    }
+
+    private async Task TryLoadTournamentSquadsAsync()
+    {
+        Uri uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        if (!QueryHelpers.ParseQuery(uri.Query).TryGetValue("tournamentId", out var tournamentIdValues) ||
+            !int.TryParse(tournamentIdValues.FirstOrDefault(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int tournamentId))
+        {
+            return;
+        }
+
+        if (!isAdmin)
+        {
+            return;
+        }
+
+        Tournament? tournament = await TournamentStore.GetAsync(tournamentId, CancellationToken.None);
+        if (tournament is not null)
+        {
+            squadName = tournament.Name;
+        }
+
+        IReadOnlyList<TournamentSquadExport> exports = await TournamentStore.ListSquadExportsAsync(
+            tournamentId,
+            CancellationToken.None);
+        foreach (TournamentSquadExport export in exports)
+        {
+            if (string.IsNullOrWhiteSpace(export.SquadXwsJson))
+            {
+                missingStoredSquads.Add(export.UserName);
+                continue;
+            }
+
+            Result<ParsedXwsSquad> parsed = MultiFactionXws.Parse(export.SquadXwsJson, export.UserName);
+            if (!parsed.IsSuccess)
+            {
+                missingStoredSquads.Add($"{export.UserName} ({parsed.Error})");
+                continue;
+            }
+
+            TryAddParsedSquad(parsed.Value!);
+        }
+    }
+
+    private Task AddPastedSquadAsync()
+    {
+        statusMessage = null;
+        Result<ParsedXwsSquad> parsed = MultiFactionXws.Parse(pasteJson);
+        if (!parsed.IsSuccess)
+        {
+            ShowStatus(parsed.Error!, Severity.Error);
+            return Task.CompletedTask;
+        }
+
+        if (!TryAddParsedSquad(parsed.Value!))
+        {
+            return Task.CompletedTask;
+        }
+
+        pasteJson = string.Empty;
+        ShowStatus("Squad added.", Severity.Success);
+        return Task.CompletedTask;
+    }
+
+    private bool TryAddParsedSquad(ParsedXwsSquad parsed)
+    {
+        if (serializationVersion is int existingVersion && existingVersion != parsed.SerializationVersion)
+        {
+            ShowStatus(
+                "All squads must use the same YASB serialization version. Remove squads or paste lists exported from the same YASB version.",
+                Severity.Error);
+            return false;
+        }
+
+        serializationVersion ??= parsed.SerializationVersion;
+        ruleset ??= parsed.Ruleset;
+        versionTag ??= parsed.VersionTag;
+
+        string label = parsed.SourceLabel ?? $"Squad {loadedSquads.Count + 1}";
+        loadedSquads.Add(new LoadedSquad
+        {
+            Key = Guid.NewGuid(),
+            Label = label,
+            Pilots = parsed.Pilots
+                .Select(p => new LoadedPilot
+                {
+                    Key = p.Key,
+                    ShipId = p.ShipId,
+                    PilotLabel = p.PilotLabel,
+                    PilotJson = p.PilotJson,
+                    SerializedChunk = p.SerializedChunk,
+                    Points = p.Points,
+                    Included = true,
+                })
+                .ToList(),
+        });
+        RebuildCombined();
+        return true;
+    }
+
+    private void RemoveSquad(Guid squadKey)
+    {
+        loadedSquads.RemoveAll(s => s.Key == squadKey);
+        if (loadedSquads.Count == 0)
+        {
+            serializationVersion = null;
+            ruleset = null;
+            versionTag = null;
+        }
+
+        RebuildCombined();
+    }
+
+    private void RemovePilot(Guid pilotKey)
+    {
+        foreach (LoadedSquad squad in loadedSquads)
+        {
+            LoadedPilot? pilot = squad.Pilots.FirstOrDefault(p => p.Key == pilotKey);
+            if (pilot is not null)
+            {
+                pilot.Included = false;
+            }
+        }
+
+        loadedSquads.RemoveAll(s => s.Pilots.All(p => !p.Included));
+        if (loadedSquads.Count == 0)
+        {
+            serializationVersion = null;
+            ruleset = null;
+            versionTag = null;
+        }
+
+        RebuildCombined();
+    }
+
+    private void RebuildCombined()
+    {
+        combinedJson = string.Empty;
+        yasbLink = null;
+        if (serializationVersion is not int version)
+        {
+            return;
+        }
+
+        IReadOnlyList<ParsedXwsPilot> included = loadedSquads
+            .SelectMany(s => s.Pilots.Where(p => p.Included))
+            .Select(p => new ParsedXwsPilot
+            {
+                Key = p.Key,
+                ShipId = p.ShipId,
+                PilotLabel = p.PilotLabel,
+                PilotJson = p.PilotJson,
+                SerializedChunk = p.SerializedChunk,
+                Points = p.Points,
+            })
+            .ToList();
+        Result<string> built = MultiFactionXws.BuildCombined(
+            included,
+            version,
+            ruleset,
+            versionTag,
+            squadName);
+        if (!built.IsSuccess)
+        {
+            return;
+        }
+
+        combinedJson = FormatJson(built.Value!);
+        yasbLink = TryReadYasbLink(combinedJson);
+    }
+
+    private static string FormatJson(string json)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(json);
+            return JsonSerializer.Serialize(document, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (JsonException)
+        {
+            return json;
+        }
+    }
+
+    private static string? TryReadYasbLink(string json)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(json);
+            if (!document.RootElement.TryGetProperty("vendor", out JsonElement vendor) ||
+                !vendor.TryGetProperty("yasb", out JsonElement yasb) ||
+                !yasb.TryGetProperty("link", out JsonElement linkElement) ||
+                linkElement.ValueKind != JsonValueKind.String)
+            {
+                return null;
+            }
+
+            return linkElement.GetString();
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private async Task CopyCombinedAsync()
+    {
+        if (string.IsNullOrEmpty(combinedJson) || clipboardModule is null)
+        {
+            return;
+        }
+
+        string compact = CompactJson(combinedJson);
+        await clipboardModule.InvokeVoidAsync("copyText", compact);
+        ShowStatus("XWS copied to clipboard.", Severity.Success);
+    }
+
+    private static string CompactJson(string json)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(json);
+            return JsonSerializer.Serialize(document);
+        }
+        catch (JsonException)
+        {
+            return json;
+        }
+    }
+
+    private void ShowStatus(string message, Severity severity)
+    {
+        statusMessage = message;
+        statusSeverity = severity;
+    }
+
+    private sealed class LoadedSquad
+    {
+        public required Guid Key { get; init; }
+        public required string Label { get; init; }
+        public required List<LoadedPilot> Pilots { get; init; }
+    }
+
+    private sealed class LoadedPilot
+    {
+        public required Guid Key { get; init; }
+        public required string ShipId { get; init; }
+        public required string PilotLabel { get; init; }
+        public required JsonElement PilotJson { get; init; }
+        public required string SerializedChunk { get; init; }
+        public int Points { get; init; }
+        public bool Included { get; set; }
+    }
+}

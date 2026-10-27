@@ -415,6 +415,9 @@ namespace Xwing.Web.Data.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<string>("SquadXwsJson")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTimeOffset>("TimeCreatedUtc")
                         .HasColumnType("datetimeoffset");
 

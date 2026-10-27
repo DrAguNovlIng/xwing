@@ -284,7 +284,39 @@ public sealed class TournamentStore : ITournamentStore
             .ToList();
         participant.SquadShipsJson = JsonSerializer.Serialize(shipEntries, SquadShipJsonOptions);
         participant.SquadUrl = squad.Url;
+        participant.SquadXwsJson = squadJson.Trim();
         return await concurrencyHelpers.SaveChangesAsync(context, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<TournamentSquadExport>> ListSquadExportsAsync(
+        int tournamentId,
+        CancellationToken cancellationToken)
+    {
+        await using XwingDbContext context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        bool tournamentExists = await context.Tournaments
+            .AsNoTracking()
+            .AnyAsync(t => t.TournamentId == tournamentId, cancellationToken)
+            .ConfigureAwait(false);
+        if (!tournamentExists)
+        {
+            return [];
+        }
+
+        List<TournamentParticipant> participants = await context.TournamentParticipants
+            .AsNoTracking()
+            .Include(p => p.User)
+            .Where(p => p.TournamentId == tournamentId)
+            .OrderBy(p => p.User.UserName)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return participants
+            .Select(p => new TournamentSquadExport
+            {
+                UserId = p.UserId,
+                UserName = p.User.UserName,
+                SquadXwsJson = string.IsNullOrWhiteSpace(p.SquadXwsJson) ? null : p.SquadXwsJson.Trim(),
+            })
+            .ToList();
     }
 
     internal static TournamentMember MapMember(
@@ -706,6 +738,13 @@ public sealed record SquadShipDisplay
 {
     public required string ShipId { get; init; }
     public required string PilotLabel { get; init; }
+}
+
+public sealed record TournamentSquadExport
+{
+    public int UserId { get; init; }
+    public string UserName { get; init; } = string.Empty;
+    public string? SquadXwsJson { get; init; }
 }
 
 internal sealed record SquadShipJsonEntry

@@ -86,6 +86,7 @@ public sealed class XwingDbContext : DbContext
             entity.HasIndex(e => new { e.TournamentId, e.UserId }).IsUnique();
             entity.Property(e => e.SquadFaction).HasMaxLength(100);
             entity.Property(e => e.SquadShipsJson).HasMaxLength(4000);
+            entity.Property(e => e.SquadXwsJson).HasColumnType("nvarchar(max)");
             entity.Property(e => e.SquadUrl).HasMaxLength(2000);
             entity.Property(e => e.TimeCreatedUtc).HasColumnType("datetimeoffset");
             entity.Property(e => e.TimeUpdatedUtc).HasColumnType("datetimeoffset");

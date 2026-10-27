@@ -69,6 +69,7 @@ else
             <MudButton Variant="Variant.Outlined" Size="Size.Small" Href="@($"/tournaments/{TournamentId}/results")">Results</MudButton>
             @if (isAdmin)
             {
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" Href="@($"/print-squads?tournamentId={TournamentId}")">Print squads</MudButton>
                 <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" Href="@($"/tournaments/{TournamentId}/edit")">Edit results</MudButton>
             }
         </div>

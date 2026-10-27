@@ -35,6 +35,9 @@ public interface ITournamentStore
         CancellationToken cancellationToken);
     Task<Result> LeaveAsync(int tournamentId, int userId, CancellationToken cancellationToken);
     Task<Result> SetSquadAsync(int tournamentId, int userId, string squadJson, CancellationToken cancellationToken);
+    Task<IReadOnlyList<TournamentSquadExport>> ListSquadExportsAsync(
+        int tournamentId,
+        CancellationToken cancellationToken);
 
     Task<Result<Tournament>> SetWinnerAsync(
         int tournamentId,

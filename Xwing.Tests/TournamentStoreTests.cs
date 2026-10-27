@@ -1164,4 +1164,58 @@ public sealed class TournamentStoreTests
             clear.Value!.WinnerUserId.ShouldBeNull();
         }
     }
+
+    [Fact]
+    public async Task SetSquadAsyncShouldPersistXwsJsonForExports()
+    {
+        DateTimeOffset today = new(2026, 10, 15, 0, 0, 0, TimeSpan.Zero);
+        var timeProvider = new FixedTimeProvider(today);
+        TestStores stores = await TestServiceFactory.CreateStoresWithResetAsync(
+            connectionString,
+            timeProvider,
+            TestContext.Current.CancellationToken);
+        using (stores)
+        {
+            Result<UserAccount> withSquad = await stores.Users.CreateAsync(
+                "with-squad",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            Result<UserAccount> noXws = await stores.Users.CreateAsync(
+                "no-xws",
+                "secret",
+                UserRoles.Member,
+                TestContext.Current.CancellationToken);
+            Result<Tournament> tournament = await stores.Tournaments.CreateAsync(
+                "Print test",
+                DefaultStart,
+                DefaultEnd,
+                false,
+                TestContext.Current.CancellationToken);
+            int tournamentId = tournament.Value!.TournamentId;
+            await stores.Tournaments.JoinAsync(
+                tournamentId,
+                withSquad.Value!.UserId,
+                null,
+                TestContext.Current.CancellationToken);
+            await stores.Tournaments.JoinAsync(
+                tournamentId,
+                noXws.Value!.UserId,
+                null,
+                TestContext.Current.CancellationToken);
+            Result saved = await stores.Tournaments.SetSquadAsync(
+                tournamentId,
+                withSquad.Value.UserId,
+                SampleSquadJson,
+                TestContext.Current.CancellationToken);
+            saved.IsSuccess.ShouldBeTrue();
+            IReadOnlyList<TournamentSquadExport> exports = await stores.Tournaments.ListSquadExportsAsync(
+                tournamentId,
+                TestContext.Current.CancellationToken);
+            exports.Count.ShouldBe(2);
+            TournamentSquadExport stored = exports.Single(e => e.UserName == "with-squad");
+            stored.SquadXwsJson.ShouldBe(SampleSquadJson.Trim());
+            exports.Single(e => e.UserName == "no-xws").SquadXwsJson.ShouldBeNull();
+        }
+    }
 }
